@@ -1,6 +1,6 @@
-import Server from "./main.ts";
+import Honovel from "Honovel";
 
-const app = Server.app;
+const app = Honovel.app;
 
 // @ts-ignore //
 const HOSTNAME = String(env("HOSTNAME", ""));
