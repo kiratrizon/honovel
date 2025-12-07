@@ -161,8 +161,33 @@ export default class HonoResponseV2 {
     return this.mimeTypes[ext] || "application/octet-stream";
   }
 
-  public xml(content: string, status = 200) {
-    this._body = content;
+  private objectToXML(obj: Record<string, any>, rootName = "root"): string {
+    let xml = `<${rootName}>`;
+
+    for (const key in obj) {
+      if (!obj.hasOwnProperty(key)) continue;
+      const value = obj[key];
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          xml += this.objectToXML(item, key);
+        }
+      } else if (typeof value === "object" && value !== null) {
+        xml += this.objectToXML(value, key);
+      } else {
+        xml += `<${key}>${String(value)}</${key}>`;
+      }
+    }
+
+    xml += `</${rootName}>`;
+    return xml;
+  }
+
+  public xml(content: string | Record<string, any>, status = 200) {
+    if (isObject(content)) {
+      content = this.objectToXML(content);
+    }
+    this._body = content as string;
     this._contentType = "application/xml";
     this._status = status;
 
