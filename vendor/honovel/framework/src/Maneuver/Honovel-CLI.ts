@@ -452,7 +452,7 @@ class MyArtisan {
     };
     if (isset(port)) {
       // @ts-ignore //
-      envObj.PORT = String(port);
+      envObj.APP_PORT = String(port);
     }
     const envWatch = envs.map((env) => env).join(",");
     let watchFlag = "";
@@ -496,7 +496,7 @@ class MyArtisan {
     };
 
     // @ts-ignore //
-    envObj.PORT = String(finalPort);
+    envObj.APP_PORT = String(finalPort);
     if (!(await isPortAvailable(finalPort))) {
       console.error(
         `Port ${finalPort} is already in use. Please choose a different port.`
