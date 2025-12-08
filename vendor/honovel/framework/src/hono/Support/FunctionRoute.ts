@@ -1339,6 +1339,8 @@ export async function handleAction(
               ) {
                 const port = viteConfig?.server?.port || 5173;
                 args.forEach((file) => {
+                  // remove leading slash for file
+                  file = file.replace(/^\//, "");
                   if (
                     file.toLowerCase().endsWith(".js") ||
                     file.toLowerCase().endsWith(".ts")
