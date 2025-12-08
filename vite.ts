@@ -2,7 +2,7 @@
 
 const inlineConfig = {
   server: {
-    port: 6000,
+    port: 5173,
   },
 
   build: {
