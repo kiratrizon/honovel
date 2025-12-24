@@ -439,11 +439,21 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
     );
   }
 
-  public static where(column: string, value: unknown): Builder {
+  public static where(column:string, operator:WhereOperator, value:WherePrimitive): Builder;
+  public static where(column: string, value: WherePrimitive): Builder;
+  public static where(callback: (qb: WhereInterpolator) => void): Builder;
+  public static where(
+    ...args: [
+        string | ((qb: WhereInterpolator) => void),
+        (WhereOperator | WherePrimitive)?,
+        WherePrimitive?,
+      ]
+  ): Builder {
     return new Builder({
       model: this,
       fields: ["*"],
-    }).where(column, value);
+      // @ts-ignore //
+    }).where(...args);
   }
 
   public static whereIn(
@@ -679,7 +689,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
   }
 }
 
-import { Builder as RawBuilder, sqlstring } from "../Query/index.ts";
+import { Builder as RawBuilder, sqlstring, WhereInterpolator, WhereOperator, WhereValue, WherePrimitive } from "../Query/index.ts";
 import { Factory, HasFactory } from "./Factories/index.ts";
 
 export class Builder<
@@ -704,7 +714,9 @@ export class Builder<
     const data = await super.first();
     if (!data) return null;
     // @ts-ignore //
-    return new this.model(data as B) as InstanceType<T>;
+    const modelInstance = new this.model();
+    modelInstance.forceFill(data as B);
+    return modelInstance;
   }
 
   // @ts-ignore //
@@ -712,8 +724,12 @@ export class Builder<
     B extends InstanceType<T> = InstanceType<T>,
   >(): Promise<B[]> {
     const data = await super.get();
-    // @ts-ignore //
-    return data.map((item) => new this.model(item as B));
+    return data.map((item) => {
+      // @ts-ignore //
+      const modelInstance = new this.model();
+      modelInstance.forceFill(item as B);
+      return modelInstance as B;
+    });
   }
 
   with(...modelActions: string[]) {
