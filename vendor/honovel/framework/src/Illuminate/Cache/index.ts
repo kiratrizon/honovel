@@ -36,6 +36,7 @@ type MaintenanceData = {
 
 export interface CacheStoreData {
   maintenance: MaintenanceData;
+  [key: string]: any;
 }
 
 export abstract class AbstractStore<T extends CacheStoreData = CacheStoreData> {
@@ -171,7 +172,7 @@ export abstract class AbstractStore<T extends CacheStoreData = CacheStoreData> {
       throw new Error(`Key cannot be an empty string`);
     }
     const keys = [this.getPrefix(), key];
-    const newKey = keys.filter((k) => isset(k) && !empty(k)).join("_");
+    const newKey = keys.filter((k) => isset(k) && !empty(k)).join("");
     return newKey;
   }
 
