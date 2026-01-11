@@ -31,7 +31,6 @@ class Boot {
       CookieKeysCache.init();
     } catch (e) {
       console.error(e);
-      Deno.exit(1);
     }
   }
 }
