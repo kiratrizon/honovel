@@ -70,8 +70,13 @@ class MyArtisan {
       stubPath = honovelPath("stubs/ControllerDefault.stub");
     }
     const stubContent = getFileContents(stubPath);
-    const controllerContent = stubContent.replace(/{{ ClassName }}/g, name);
+    let controllerContent = stubContent.replace(/{{ ClassName }}/g, name);
 
+    if (options.resource) {
+      // remove the Controller in name
+      const paramName = name.replace("Controller", "");
+      controllerContent = controllerContent.replace(/{{ paramName }}/g, paramName);
+    }
     writeFile(basePath(`app/Http/Controllers/${name}.ts`), controllerContent);
     console.log(
       `Controller file created at ${path.relative(

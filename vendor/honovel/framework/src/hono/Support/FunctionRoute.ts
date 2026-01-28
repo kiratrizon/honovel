@@ -672,7 +672,7 @@ function generateMiddlewareOrDispatch(
                 abort(404);
               }
             }
-            middlewareResp = await args(myHono, ...Object.values(newParams));
+            middlewareResp = await args(myHono, newParams);
           }
           if (isNull(middlewareResp) && type === "dispatch") {
             resp = c.json(null);
