@@ -17,7 +17,7 @@ export default class RouteServiceProvider extends ServiceProvider {
 
     Route.prefix("/api").middleware("api").group(basePath("routes/api.ts"));
 
-    // Route domain is not supported in boot, so we will not register domain routes here.
+    // Route domain is not supported in boot, so don't register domain routes here.
   }
 
   public static home = "/home";
