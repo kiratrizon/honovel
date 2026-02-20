@@ -97,7 +97,7 @@ if (config("app").env === "local") {
 
 const headFunction: MiddlewareHandler = async (
   c: MyContext,
-  next: () => Promise<void>
+  next: () => Promise<void>,
 ) => {
   const { request } = c.get("myHono");
   if (!request.isMethod("HEAD")) {
@@ -111,7 +111,7 @@ function domainGroup(
     sequenceParams,
   }: {
     sequenceParams: string[];
-  }
+  },
 ): MiddlewareHandler {
   return async (c: MyContext, next: () => Promise<void>) => {
     const workingParams = [...sequenceParams];
@@ -153,7 +153,7 @@ const [globalMiddleware, globalMiddlewareFallback]: [
 // domain on beta test
 const _forDomain: MiddlewareHandler = async (
   c: MyContext,
-  next: () => Promise<void>
+  next: () => Promise<void>,
 ) => {
   const requestUrl = new URL(c.req.url);
   const appUrl = env("APP_URL", "").toLowerCase();
@@ -163,7 +163,7 @@ const _forDomain: MiddlewareHandler = async (
   if (isset(env("DENO_DEPLOYMENT_ID"))) {
     incomingUrl = `${protocol}://${incoming.replace(
       `-${env("DENO_DEPLOYMENT_ID", "")}`,
-      ""
+      "",
     )}`;
   } else {
     incomingUrl = `${protocol}://${incoming}`;
@@ -183,7 +183,7 @@ const _forDomain: MiddlewareHandler = async (
     for (const pattern in Server.domainPattern[key]) {
       if (pattern.includes("*")) {
         const regex = new RegExp(
-          "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$"
+          "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$",
         );
 
         if (regex.test(host)) {
@@ -265,7 +265,7 @@ class Server {
       this.app.all("/myadmin/*", async (c: MyContext) => {
         const targetUrl = `${env("PHPMYADMIN_HOST")}${c.req.path.replace(
           "/myadmin",
-          ""
+          "",
         )}${c.req.query() ? `?${c.req.raw.url.split("?")[1]}` : ""}`;
 
         const headers = new Headers(c.req.raw.headers);
@@ -302,7 +302,7 @@ class Server {
 
   private static async generateNewApp(
     conf?: Record<string, unknown>,
-    withDefaults: boolean = false
+    withDefaults: boolean = false,
   ): Promise<HonoType> {
     let app: HonoType;
     if (isset(conf) && !empty(conf)) {
@@ -323,7 +323,7 @@ class Server {
 
   private static applyMainMiddleware(
     filePath: string,
-    app: HonoType
+    app: HonoType,
   ): [string, TFallbackMiddleware[]] {
     const mainMiddleware = [];
     // @ts-ignore //
@@ -348,7 +348,7 @@ class Server {
       buildRequestInit(),
       // build the globalMiddlewareHere
       ...globalMiddleware,
-      ...routeGroupMiddleware
+      ...routeGroupMiddleware,
     );
     // return the prefix if exists
     return [groupRoutes[filePath]?.prefix || "/", routeGroupMiddlewareFallback];
@@ -429,7 +429,7 @@ class Server {
               const splittedUri = URLArranger.generateOptionalParamRoutes(
                 arrangerDispatch.string,
                 "dispatch",
-                flagWhere
+                flagWhere,
               );
               if (flagName !== "") {
                 const fixUri = `${routePrefix == "/" ? "" : routePrefix}${
@@ -443,7 +443,7 @@ class Server {
                   };
                 } else {
                   console.warn(
-                    `Route name "${flagName}" already exists. Overriding it is not allowed.`
+                    `Route name "${flagName}" already exists. Overriding it is not allowed.`,
                   );
                 }
               }
@@ -453,7 +453,7 @@ class Server {
                   args: myConfig.callback as IMyConfig["callback"],
                   debugString: myConfig.debugString,
                 },
-                arrangerDispatch.sequenceParams
+                arrangerDispatch.sequenceParams,
               );
               const [flagMiddlewareArr, flagMiddlewareFallback]: [
                 MiddlewareHandler[],
@@ -486,7 +486,7 @@ class Server {
                 newApp.on(
                   methodarr.map((m) => m.toUpperCase()),
                   splittedUri,
-                  ...allBuilds
+                  ...allBuilds,
                 );
               }
               byEndpointsRouter.route("/", newApp);
@@ -547,7 +547,7 @@ class Server {
 
                 const domainArranger = URLArranger.urlCombiner(
                   domain.split("."),
-                  false
+                  false,
                 );
                 domainArranger.string = domainArranger.string
                   .slice(1)
@@ -564,7 +564,7 @@ class Server {
               if (!empty(name)) {
                 newName = (name.replace(/\*\d+\*/g, "") || "/").replace(
                   /\/+/g,
-                  "/"
+                  "/",
                 );
               }
 
@@ -589,7 +589,7 @@ class Server {
                     args: myConfig.callback as IMyConfig["callback"],
                     debugString: myConfig.debugString,
                   },
-                  myParam
+                  myParam,
                 );
                 // console.debug(myParam);
                 const arrangerDispatch = URLArranger.urlCombiner(myConfig.uri);
@@ -603,7 +603,7 @@ class Server {
                 const splittedUri = URLArranger.generateOptionalParamRoutes(
                   newMethodUri,
                   "dispatch",
-                  flagWhere
+                  flagWhere,
                 );
                 const flagName = flag.name || "";
                 if (flagName !== "") {
@@ -615,7 +615,7 @@ class Server {
                   finalName += flagName;
                   if (keyExist(this.routes, finalName)) {
                     console.warn(
-                      `Route name "${flagName}" already exists. Overriding it is not allowed.`
+                      `Route name "${flagName}" already exists. Overriding it is not allowed.`,
                     );
                   } else {
                     const finalUrl = `${routePrefix == "/" ? "" : routePrefix}${
@@ -666,7 +666,7 @@ class Server {
                   myNewGroup.on(
                     methodarr.map((m) => m.toUpperCase()),
                     splittedUri,
-                    ...allBuilds
+                    ...allBuilds,
                   );
                 }
               });
@@ -674,7 +674,7 @@ class Server {
               const generatedopts = URLArranger.generateOptionalParamRoutes(
                 arrangerGroup.string,
                 "group",
-                where
+                where,
               );
               generatedopts.forEach((grp) => {
                 // apply the middlewares here
@@ -687,11 +687,11 @@ class Server {
               } else if (isset(domain) && !empty(domain)) {
                 this.applyMainMiddleware(
                   "",
-                  Server.domainPattern[key][domainName] as HonoType
+                  Server.domainPattern[key][domainName] as HonoType,
                 );
                 Server.domainPattern[key][domainName].route(
                   routePrefix,
-                  newAppGroup
+                  newAppGroup,
                 );
               }
             }
@@ -762,7 +762,7 @@ globalFn(
     requiredParams.forEach((param) => {
       finalUrl = finalUrl.replace(
         `{${param}}`,
-        encodeURIComponent(params[param])
+        encodeURIComponent(params[param]),
       );
     });
 
@@ -771,7 +771,7 @@ globalFn(
       if (keyExist(params, param)) {
         finalUrl = finalUrl.replace(
           `{${param}?}`,
-          encodeURIComponent(params[param])
+          encodeURIComponent(params[param]),
         );
       } else {
         // remove segment with optional param cleanly
@@ -780,7 +780,7 @@ globalFn(
     });
 
     return finalUrl;
-  }
+  },
 );
 
 export default Server;

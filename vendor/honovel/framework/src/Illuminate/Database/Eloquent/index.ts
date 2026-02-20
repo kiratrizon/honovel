@@ -11,7 +11,7 @@ export type ModelWithAttributes<
 > = (new (...args: ConstructorParameters<C>) => InstanceType<C> & T) & C;
 
 export function schemaKeys<T extends Record<string, unknown>>(
-  keys: (keyof T)[]
+  keys: (keyof T)[],
 ) {
   return keys;
 }
@@ -208,7 +208,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
       keyExist((this.constructor as typeof Model)._guarded, key)
     ) {
       throw new Error(
-        `Attribute "${String(key)}" is guarded and cannot be set.`
+        `Attribute "${String(key)}" is guarded and cannot be set.`,
       );
     }
     if (
@@ -242,7 +242,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
     if (this.usesTimestamps()) {
       fillable.push(
         (this.constructor as typeof Model).createdAtColumn,
-        (this.constructor as typeof Model).updatedAtColumn
+        (this.constructor as typeof Model).updatedAtColumn,
       );
     }
     if (isset(fillable) && fillable.length > 0) {
@@ -252,14 +252,14 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
         } else {
           // ignore the attribute if not fillable
           throw new Error(
-            `Attribute "${key}" is not fillable on model ${this.constructor.name}.`
+            `Attribute "${key}" is not fillable on model ${this.constructor.name}.`,
           );
         }
       }
     } else {
       if (!isset(guarded) || !guarded.length) {
         throw new Error(
-          `No fillable attributes defined for model ${this.constructor.name}.`
+          `No fillable attributes defined for model ${this.constructor.name}.`,
         );
       }
       for (const [key, value] of Object.entries(attributes)) {
@@ -290,22 +290,31 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    * Convert the model instance to a plain object.
    * @returns A plain object representation of the model.
    */
-  public toObject(): Record<Array<string>[number], unknown> {
-    const data = { ...this._attributes };
+  public toObject(): Record<string, unknown> {
+    const data: Record<string, unknown> = { ...this._attributes };
 
-    if ((this.constructor as typeof Model)._visible.length) {
-      const visibleData = {} as Record<Array<string>[number], unknown>;
-      for (const key of (this.constructor as typeof Model)._visible) {
-        if (keyExist(data, key)) {
-          visibleData[key] = data[key];
+    // Handle hidden & visible
+    if ((this.constructor as typeof Model)._visible.length > 0) {
+      // Only include visible keys
+      for (const key of Object.keys(data)) {
+        if (!(this.constructor as typeof Model)._visible.includes(key)) {
+          delete data[key];
         }
       }
-      return visibleData;
     }
-
-    if ((this.constructor as typeof Model)._hidden.length) {
+    if ((this.constructor as typeof Model)._hidden.length > 0) {
+      // Remove hidden keys
       for (const key of (this.constructor as typeof Model)._hidden) {
         delete data[key];
+      }
+    }
+
+    // Recursively convert related models (if any)
+    for (const [key, value] of Object.entries(data)) {
+      if (value instanceof Model) {
+        data[key] = value.toObject(); // single related model
+      } else if (value instanceof Collection) {
+        data[key] = value.toArray(); // collection of related models
       }
     }
 
@@ -410,7 +419,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public addAccessor(
     attribute: keyof T,
-    fn: (value: T[keyof T]) => unknown
+    fn: (value: T[keyof T]) => unknown,
   ): void {
     if (!isFunction(fn)) {
       throw new Error("Accessor must be a function.");
@@ -423,7 +432,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
           if (
             keyExist(
               (this.constructor as typeof Model)._accessors,
-              attribute
+              attribute,
             ) &&
             isFunction((this.constructor as typeof Model)._accessors[attribute])
           ) {
@@ -448,13 +457,13 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public addMutator<K extends keyof T>(
     attribute: K,
-    fn: (value: T[K]) => unknown
+    fn: (value: T[K]) => unknown,
   ): void {
     if (typeof fn !== "function") {
       throw new Error("Mutator must be a function.");
     }
     (this.constructor as typeof Model)._mutators[String(attribute)] = fn as (
-      value: unknown
+      value: unknown,
     ) => unknown;
   }
 
@@ -478,7 +487,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    * @returns The created model instance.
    */
   public static async create<Attr extends Record<string, unknown>>(
-    attributes?: Attr
+    attributes?: Attr,
   ) {
     // @ts-ignore //
     const instance = new this(attributes) as Model<ModelAttributes>;
@@ -555,11 +564,15 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
       {
         model: this,
       },
-      arrActionsAndFields
+      arrActionsAndFields,
     );
   }
 
-  public static where(column:string, operator:WhereOperator, value:WherePrimitive): Builder;
+  public static where(
+    column: string,
+    operator: WhereOperator,
+    value: WherePrimitive,
+  ): Builder;
   public static where(column: string, value: WherePrimitive): Builder;
   public static where(callback: (qb: WhereInterpolator) => void): Builder;
   /**
@@ -569,10 +582,10 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static where(
     ...args: [
-        string | ((qb: WhereInterpolator) => void),
-        (WhereOperator | WherePrimitive)?,
-        WherePrimitive?,
-      ]
+      string | ((qb: WhereInterpolator) => void),
+      (WhereOperator | WherePrimitive)?,
+      WherePrimitive?,
+    ]
   ): Builder {
     return new Builder({
       model: this,
@@ -589,7 +602,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static whereIn(
     column: string,
-    values: unknown[]
+    values: unknown[],
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -605,7 +618,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static whereNotIn(
     column: string,
-    values: unknown[]
+    values: unknown[],
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -619,7 +632,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    * @returns The query builder instance.
    */
   public static whereNull(
-    column: string
+    column: string,
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -633,7 +646,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    * @returns The query builder instance.
    */
   public static whereNotNull(
-    column: string
+    column: string,
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -649,7 +662,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static whereBetween(
     column: string,
-    values: [unknown, unknown]
+    values: [unknown, unknown],
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -665,7 +678,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static whereNotBetween(
     column: string,
-    values: [unknown, unknown]
+    values: [unknown, unknown],
   ): Builder<ModelAttributes, typeof Model<ModelAttributes>> {
     return new Builder({
       model: this,
@@ -697,7 +710,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
   public static leftJoin(
     table: string,
     column1: string,
-    column2: string
+    column2: string,
   ): Builder {
     return new Builder({
       model: this,
@@ -715,7 +728,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
   public static rightJoin(
     table: string,
     column1: string,
-    column2: string
+    column2: string,
   ): Builder {
     return new Builder({
       model: this,
@@ -745,7 +758,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
   public static fullJoin(
     table: string,
     column1: string,
-    column2: string
+    column2: string,
   ): Builder {
     return new Builder({
       model: this,
@@ -773,7 +786,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public static orderBy(
     column: string,
-    direction: "asc" | "desc" = "asc"
+    direction: "asc" | "desc" = "asc",
   ): Builder {
     return new Builder({
       model: this,
@@ -838,7 +851,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
       const record = await this.find<M>(id);
       if (!record) {
         throw new Error(
-          `${this.name} where ${this._primaryKey}='${id}' not found.`
+          `${this.name} where ${this._primaryKey}='${id}' not found.`,
         );
       }
       return record;
@@ -879,12 +892,12 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
       // Create new record
       const newRecord = await DB.connection(this.getConnection()).insert(
         tableName,
-        data
+        data,
       );
       // get the inserted id
       this.setAttribute(
         primaryKey,
-        newRecord.lastInsertRowId as T[typeof primaryKey]
+        newRecord.lastInsertRowId as T[typeof primaryKey],
       );
     }
   }
@@ -897,7 +910,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
    */
   public hasMany(
     relationModel: typeof Model<ModelAttributes>,
-    foreignKey?: string
+    foreignKey?: string,
   ) {
     if (!foreignKey) {
       const primaryKey = this.getKeyName();
@@ -906,7 +919,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
     const primaryValue = this.getKey();
     if (!isset(primaryValue)) {
       throw new Error(
-        `Model ${this.constructor.name} does not have a primary key set.`
+        `Model ${this.constructor.name} does not have a primary key set.`,
       );
     }
     return new Builder({
@@ -914,6 +927,14 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
       fields: ["*"],
     }).where(foreignKey, this.getKey());
   }
+
+  // for has one
+  /**
+   * Define a one-to-one relationship.
+   * @param relationModel The related model class.
+   * @param foreignKey The foreign key column name.
+   * @returns The relationship query builder.
+   */
 
   /**
    * Check if the user has verified their email address.
@@ -925,7 +946,15 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
   }
 }
 
-import { Builder as RawBuilder, sqlstring, WhereInterpolator, WhereOperator, WhereValue, WherePrimitive } from "../Query/index.ts";
+import {
+  Builder as RawBuilder,
+  sqlstring,
+  WhereInterpolator,
+  WhereOperator,
+  WhereValue,
+  WherePrimitive,
+} from "../Query/index.ts";
+import Collection from "./Collection.ts";
 import { Factory, HasFactory } from "./Factories/index.ts";
 
 export class Builder<
@@ -935,7 +964,7 @@ export class Builder<
   protected model: T;
   constructor(
     { model, fields = ["*"] }: { model: T; fields?: sqlstring[] },
-    db?: string
+    db?: string,
   ) {
     // @ts-ignore //
     const instanceModel = new model();
@@ -960,18 +989,23 @@ export class Builder<
     B extends InstanceType<T> = InstanceType<T>,
   >(): Promise<B[]> {
     const data = await super.get();
-    return data.map((item) => {
+    const mapped = data.map((item) => {
       // @ts-ignore //
       const modelInstance = new this.model();
       modelInstance.forceFill(item as B);
       return modelInstance as B;
     });
+    if (!mapped.length) return [];
+    if (isArray(mapped) && mapped.length) {
+      return new Collection<B>(mapped);
+    }
+    return mapped;
   }
 
   /**
-    * Eager load relationships for the model.
-    * @param modelActions The relationships to load.
-    */
+   * Eager load relationships for the model.
+   * @param modelActions The relationships to load.
+   */
   with(...modelActions: string[]) {
     const arrActionsAndFields: Array<{
       actions: string[];
@@ -994,7 +1028,7 @@ export class Builder<
         on: this.dbUsed,
       },
       arrActionsAndFields,
-      this
+      this,
     );
   }
 }
@@ -1011,7 +1045,7 @@ export class WithBuilder {
       on?: string;
     },
     private actionsAndFields: { actions: string[]; fields: string[][] }[],
-    private builderInstance?: Builder
+    private builderInstance?: Builder,
   ) {
     this.model = model;
     // @ts-ignore //
@@ -1020,11 +1054,9 @@ export class WithBuilder {
   }
 
   async get() {
-    const allThisData = (
-      !this.builderInstance
-        ? await this.model.on(this.connection).all()
-        : await this.builderInstance.get()
-    ).map((item) => item.toObject());
+    const allThisData = !this.builderInstance
+      ? await this.model.on(this.connection).all()
+      : await this.builderInstance.get();
     if (!allThisData.length) return allThisData;
 
     const currentLevel = {
@@ -1062,7 +1094,7 @@ export class WithBuilder {
       model: typeof Model<ModelAttributes>;
     },
     actions: string[],
-    fields: string[][]
+    fields: string[][],
   ) {
     while (actions.length > 0 && currentLevel.data.length > 0) {
       const action = actions.shift();
@@ -1079,7 +1111,7 @@ export class WithBuilder {
         for (const item of items) {
           // @ts-ignore //
           const instance = new currentLevel.model(
-            item
+            item,
           ) as Model<ModelAttributes>;
           if (methodExist(instance, action)) {
             const relatedData = (instance as any)[action]() as Builder;
@@ -1110,7 +1142,7 @@ export class WithBuilder {
 class AfterOn {
   constructor(
     private model: typeof Model<ModelAttributes>,
-    private connection: string
+    private connection: string,
   ) {}
 
   public async create<Attr extends Record<string, unknown>>(attributes?: Attr) {
@@ -1126,7 +1158,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).where(column, value);
   }
 
@@ -1136,7 +1168,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereIn(column, values);
   }
 
@@ -1146,7 +1178,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereNotIn(column, values);
   }
 
@@ -1156,7 +1188,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereNull(column);
   }
 
@@ -1166,7 +1198,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereNotNull(column);
   }
 
@@ -1176,7 +1208,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereBetween(column, values);
   }
 
@@ -1186,7 +1218,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).whereNotBetween(column, values);
   }
 
@@ -1196,7 +1228,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).join(table, column1, column2);
   }
 
@@ -1206,7 +1238,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).leftJoin(table, column1, column2);
   }
 
@@ -1216,7 +1248,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).rightJoin(table, column1, column2);
   }
 
@@ -1226,7 +1258,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).crossJoin(table);
   }
 
@@ -1236,7 +1268,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).fullJoin(table, column1, column2);
   }
 
@@ -1246,7 +1278,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).groupBy(...columns);
   }
 
@@ -1256,7 +1288,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).orderBy(column, direction);
   }
 
@@ -1268,7 +1300,7 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).get<T>();
   }
 
@@ -1280,24 +1312,24 @@ class AfterOn {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     ).first();
   }
 
   public async find<M extends Model<ModelAttributes> = Model<ModelAttributes>>(
-    id: string | number
+    id: string | number,
   ): Promise<M | null> {
     return (await new Builder(
       {
         model: this.model,
         fields: ["*"],
       },
-      this.connection
+      this.connection,
     )
       .where(
         // @ts-ignore //
         new this.model().getKeyName(),
-        id
+        id,
       )
       .first()) as unknown as M;
   }
@@ -1338,7 +1370,7 @@ class AfterOn {
         model: this.model,
         on: this.connection,
       },
-      arrActionsAndFields
+      arrActionsAndFields,
     );
   }
 }
