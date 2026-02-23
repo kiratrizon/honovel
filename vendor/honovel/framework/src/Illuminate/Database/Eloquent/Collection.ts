@@ -9,29 +9,31 @@ class Collection<T extends Model> extends Array<T> {
     // Object.setPrototypeOf(this, Collection.prototype);
   }
 
-  // Example: add a Laravel-style `first` method
+  /**
+   * Get the first item in the collection or null if empty.
+   * @returns Model instance or null
+   */
   first(): T | null {
     return this.length > 0 ? this[0] : null;
   }
 
-  // Example: add a Laravel-style `pluck`
+  /**
+   * Get an array of values for a given key from all items in the collection.
+   * @param key The key to pluck values for.
+   * @returns An array of values for the specified key.
+   */
   pluck<K extends keyof T>(key: K): Array<T[K]> {
     return this.map((item) => item[key]);
   }
 
+  /**
+   * Convert the collection to an array of plain objects.
+   * @returns An array of plain objects representing the collection items.
+   */
   toArray(): (T | Record<string, unknown>)[] {
     const data: (T | Record<string, unknown>)[] = [];
     for (const item of this) {
-      const attributes = item.getRawAttributes();
-      for (const [key, value] of Object.entries(attributes)) {
-        if (value instanceof Collection) {
-          attributes[key] = value.toArray();
-        } else if (value instanceof Model) {
-          attributes[key] = value.toObject();
-        } else {
-          attributes[key] = value;
-        }
-      }
+      const attributes = item.toObject();
       data.push(attributes);
     }
     return data;

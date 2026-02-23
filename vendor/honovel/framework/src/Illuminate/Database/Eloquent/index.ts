@@ -252,7 +252,7 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
         } else {
           // ignore the attribute if not fillable
           throw new Error(
-            `Attribute "${key}" is not fillable on model ${this.constructor.name}.`,
+            `Attribute '${key}' is not fillable on model ${this.constructor.name}.`,
           );
         }
       }
@@ -922,19 +922,44 @@ export abstract class Model<T extends ModelAttributes = ModelAttributes> {
         `Model ${this.constructor.name} does not have a primary key set.`,
       );
     }
+    const has = "hasMany";
     return new Builder({
       model: relationModel,
       fields: ["*"],
+      has,
     }).where(foreignKey, this.getKey());
   }
 
-  // for has one
   /**
    * Define a one-to-one relationship.
    * @param relationModel The related model class.
    * @param foreignKey The foreign key column name.
    * @returns The relationship query builder.
    */
+
+  public hasOne(
+    relationModel: typeof Model<ModelAttributes>,
+    foreignKey?: string,
+  ) {
+    if (!foreignKey) {
+      const primaryKey = this.getKeyName();
+      foreignKey = `${this.getTableName()}_${primaryKey}`;
+    }
+    const primaryValue = this.getKey();
+    if (!isset(primaryValue)) {
+      throw new Error(
+        `Model ${this.constructor.name} does not have a primary key set.`,
+      );
+    }
+    const has = "hasOne";
+    return new Builder({
+      model: relationModel,
+      fields: ["*"],
+      has,
+    })
+      .where(foreignKey, this.getKey())
+      .limit(1);
+  }
 
   /**
    * Check if the user has verified their email address.
@@ -957,13 +982,19 @@ import {
 import Collection from "./Collection.ts";
 import { Factory, HasFactory } from "./Factories/index.ts";
 
+type THas = "hasMany" | "hasOne";
 export class Builder<
   B extends ModelAttributes = ModelAttributes,
   T extends typeof Model<B> = typeof Model<B>,
 > extends RawBuilder {
   protected model: T;
+  public _has?: THas;
   constructor(
-    { model, fields = ["*"] }: { model: T; fields?: sqlstring[] },
+    {
+      model,
+      fields = ["*"],
+      has,
+    }: { model: T; fields?: sqlstring[]; has?: THas },
     db?: string,
   ) {
     // @ts-ignore //
@@ -972,6 +1003,7 @@ export class Builder<
     const dbUsed = db || instanceModel.getConnection();
     super({ table, fields }, dbUsed);
     this.model = model;
+    this._has = has;
   }
 
   // @ts-ignore //
@@ -986,20 +1018,19 @@ export class Builder<
 
   // @ts-ignore //
   public override async get<
-    B extends InstanceType<T> = InstanceType<T>,
-  >(): Promise<B[]> {
+    M extends Model<ModelAttributes> = Model<B>,
+  >(): Promise<Collection<M>> {
     const data = await super.get();
     const mapped = data.map((item) => {
       // @ts-ignore //
       const modelInstance = new this.model();
-      modelInstance.forceFill(item as B);
-      return modelInstance as B;
+      modelInstance.forceFill(item as M);
+      return modelInstance as M;
     });
-    if (!mapped.length) return [];
-    if (isArray(mapped) && mapped.length) {
-      return new Collection<B>(mapped);
+    if (isArray(mapped)) {
+      return new Collection<M>(mapped);
     }
-    return mapped;
+    throw new Error("Expected an array of results.");
   }
 
   /**
@@ -1065,6 +1096,7 @@ export class WithBuilder {
     };
 
     for (const { actions, fields } of this.actionsAndFields) {
+      // @ts-ignore //
       await this.iterateWith(currentLevel, [...actions], [...fields]);
     }
 
@@ -1072,11 +1104,9 @@ export class WithBuilder {
   }
 
   async first() {
-    const allThisData = (
-      !this.builderInstance
-        ? await this.model.on(this.connection).first()
-        : await this.builderInstance.first()
-    )?.toObject();
+    const allThisData = !this.builderInstance
+      ? await this.model.on(this.connection).first()
+      : await this.builderInstance.first();
     if (!allThisData) return null;
     const currentLevel = {
       data: [[allThisData]],
@@ -1090,7 +1120,7 @@ export class WithBuilder {
 
   private async iterateWith(
     currentLevel: {
-      data: Record<string, unknown>[][];
+      data: Model<ModelAttributes>[][];
       model: typeof Model<ModelAttributes>;
     },
     actions: string[],
@@ -1101,31 +1131,35 @@ export class WithBuilder {
       const fieldsForAction = fields.shift() || ["*"];
       if (!action) break;
       const nextLevel: {
-        data: Record<string, unknown>[][];
+        data: Model<ModelAttributes>[][];
         model: typeof Model<ModelAttributes>;
       } = {
         data: [],
         model: null as unknown as typeof Model<ModelAttributes>,
       };
       for (const items of currentLevel.data) {
-        for (const item of items) {
-          // @ts-ignore //
-          const instance = new currentLevel.model(
-            item,
-          ) as Model<ModelAttributes>;
+        for (const instance of items) {
           if (methodExist(instance, action)) {
             const relatedData = (instance as any)[action]() as Builder;
             if (relatedData instanceof Builder) {
-              const relatedItems = await relatedData
-                .select(...fieldsForAction)
-                .get();
+              const query = relatedData.select(...fieldsForAction);
+              const relatedItems = await query.get();
               if (relatedItems.length > 0) {
-                item[action] = relatedItems.map((relatedItem) => {
-                  return relatedItem.toObject();
-                });
-                nextLevel.data.push([
-                  ...(item[action] as Record<string, unknown>[]),
-                ]);
+                // instance[action] = relatedItems.map((relatedItem) => {
+                //   return relatedItem.toObject();
+                // });
+                // before fill, delete function
+                // instance[action] = relatedItems;
+                if (relatedData._has === "hasOne") {
+                  instance.forceFill({
+                    [action]: relatedItems.first(),
+                  });
+                } else {
+                  instance.forceFill({
+                    [action]: relatedItems,
+                  });
+                }
+                nextLevel.data.push(relatedItems);
                 // @ts-ignore //
                 nextLevel.model = relatedData.model;
               }

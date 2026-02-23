@@ -1,6 +1,7 @@
 import { CookieOptions } from "hono/utils/cookie";
 import Collection from "Illuminate/Database/Eloquent/Collection.ts";
 import { Model } from "Illuminate/Database/Eloquent/index.ts";
+import BindingRegistry from "../Core/BindingRegistry.ts";
 
 export default class HonoResponseV2 {
   protected _headers: Headers = new Headers();
@@ -45,31 +46,7 @@ export default class HonoResponseV2 {
   }
 
   public json(data: unknown, status = 200) {
-    let newData;
-    const bindings = [
-      {
-        action: "toObject",
-        class: Model,
-      },
-      {
-        action: "toArray",
-        class: Collection,
-      },
-    ];
-    const detectedBinding = bindings.find((binding) => {
-      if (data instanceof binding.class) {
-        return binding;
-      }
-    });
-    if (
-      detectedBinding &&
-      data instanceof detectedBinding.class &&
-      methodExist(data, detectedBinding.action)
-    ) {
-      newData = (data as any)[detectedBinding.action]();
-    } else {
-      newData = data;
-    }
+    const newData = BindingRegistry.bindData(data);
     this._body = JSON.stringify(newData, (_key, value) =>
       typeof value === "bigint" ? value.toString() : value,
     );

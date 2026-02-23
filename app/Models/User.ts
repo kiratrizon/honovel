@@ -3,7 +3,6 @@ import {
   JWTSubject,
 } from "Illuminate/Contracts/Auth/index.ts";
 import { HasFactory } from "Illuminate/Database/Eloquent/Factories/index.ts";
-import AdminDetail from "./AdminDetail.ts";
 
 export type UserSchema = {
   id?: number;
@@ -27,7 +26,7 @@ class User extends Authenticatable<UserSchema> implements JWTSubject {
     HasFactory,
   };
 
-  protected static override _hidden = ["password"];
+  protected static override _hidden = ["password", "api_token"];
 
   public getJWTCustomClaims(): Record<string, unknown> {
     return {
@@ -38,11 +37,6 @@ class User extends Authenticatable<UserSchema> implements JWTSubject {
 
   public getJWTIdentifier(): string | number {
     return this.getAuthIdentifier() || "";
-  }
-
-  public admins() {
-    // @ts-ignore //
-    return this.hasMany(AdminDetail, "admin_id");
   }
 }
 
