@@ -17,7 +17,7 @@ globalFn(
   "view",
   (viewName: string, data: Record<string, unknown> = {}, mergeData = {}) => {
     return new HonoView({ viewName, data, mergeData });
-  }
+  },
 );
 
 globalFn("dd", (...args: unknown[]) => {

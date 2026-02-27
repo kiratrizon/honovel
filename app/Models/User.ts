@@ -26,7 +26,7 @@ class User extends Authenticatable<UserSchema> implements JWTSubject {
     HasFactory,
   };
 
-  protected static override _hidden = ["password"];
+  protected static override _hidden = ["password", "api_token"];
 
   public getJWTCustomClaims(): Record<string, unknown> {
     return {

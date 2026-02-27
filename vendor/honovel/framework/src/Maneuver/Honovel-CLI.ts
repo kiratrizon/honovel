@@ -29,7 +29,7 @@ class MyArtisan {
     if (!options.force) {
       if (await pathExist(basePath(`config/${name}.ts`))) {
         console.error(
-          `Config file ${basePath(`config/${name}.ts`)} already exist.`
+          `Config file ${basePath(`config/${name}.ts`)} already exist.`,
         );
         return;
       }
@@ -37,8 +37,8 @@ class MyArtisan {
     writeFile(basePath(`config/${name}.ts`), stubContent);
     console.log(
       `${options.force ? "Overwrote" : "File created at"} ${basePath(
-        `config/${name}.ts`
-      )}`
+        `config/${name}.ts`,
+      )}`,
     );
     return;
   }
@@ -75,14 +75,17 @@ class MyArtisan {
     if (options.resource) {
       // remove the Controller in name
       const paramName = name.replace("Controller", "");
-      controllerContent = controllerContent.replace(/{{ paramName }}/g, paramName);
+      controllerContent = controllerContent.replace(
+        /{{ paramName }}/g,
+        paramName,
+      );
     }
     writeFile(basePath(`app/Http/Controllers/${name}.ts`), controllerContent);
     console.log(
       `Controller file created at ${path.relative(
         Deno.cwd(),
-        basePath(`app/Http/Controllers/${name}.ts`)
-      )}`
+        basePath(`app/Http/Controllers/${name}.ts`),
+      )}`,
     );
     return;
   }
@@ -110,7 +113,7 @@ class MyArtisan {
       all?: boolean;
       pivot?: boolean;
     },
-    name: string
+    name: string,
   ) {
     const modelPath = basePath(`app/Models/${name}.ts`);
     const stubPath = honovelPath("stubs/Model.stub");
@@ -119,7 +122,7 @@ class MyArtisan {
 
     writeFile(modelPath, modelContent);
     console.log(
-      `Model file created at ${path.relative(Deno.cwd(), modelPath)}`
+      `Model file created at ${path.relative(Deno.cwd(), modelPath)}`,
     );
 
     if (options.migration || options.all) {
@@ -129,7 +132,7 @@ class MyArtisan {
     if (options.controller || options.all) {
       await this.makeController(
         { resource: options.resource },
-        `${name}Controller`
+        `${name}Controller`,
       );
     }
     if (options.pivot) {
@@ -147,7 +150,7 @@ class MyArtisan {
     if (!(await dbHelper.askIfDBExist())) {
       const dbName = dbHelper.getDatabaseName();
       const createDB = await Confirm.prompt(
-        `Database \`${dbName}\` does not exist. Do you want to create it?`
+        `Database \`${dbName}\` does not exist. Do you want to create it?`,
       );
       if (createDB) {
         await dbHelper.createDatabase();
@@ -352,7 +355,7 @@ class MyArtisan {
               table.integer("batch");
               table.timestamps();
             },
-            this.connection
+            this.connection,
           );
         }
       }
@@ -372,7 +375,7 @@ class MyArtisan {
       case "mysql": {
         const result = await DB.connection(connection).select(
           `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`,
-          [config(`database.connections.${connection}.database`)]
+          [config(`database.connections.${connection}.database`)],
         );
         tables = result.map((row) => `\`${row.TABLE_NAME}\``);
         break;
@@ -380,7 +383,7 @@ class MyArtisan {
 
       case "pgsql": {
         const result = await DB.connection(connection).select(
-          `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
+          `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
         );
         tables = result.map((row) => `"${row.tablename}"`);
         break;
@@ -388,7 +391,7 @@ class MyArtisan {
 
       case "sqlite": {
         const result = await DB.connection(connection).select(
-          `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+          `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
         );
         tables = result.map((row) => `"${row.name}"`);
         break;
@@ -396,7 +399,7 @@ class MyArtisan {
 
       case "sqlsrv": {
         const result = await DB.connection(connection).select(
-          `SELECT name FROM sys.tables`
+          `SELECT name FROM sys.tables`,
         );
         tables = result.map((row) => `[${row.name}]`);
         break;
@@ -438,10 +441,10 @@ class MyArtisan {
 
     writeFile(
       basePath(`database/migrations/${migrationName}`),
-      migrationContent
+      migrationContent,
     );
     console.log(
-      `Migration file created at database/migrations/${migrationName}`
+      `Migration file created at database/migrations/${migrationName}`,
     );
   }
 
@@ -489,7 +492,7 @@ class MyArtisan {
       hostname: string,
       port: number,
       hasCert: boolean,
-      path: string = "/__warmup"
+      path: string = "/__warmup",
     ): string => {
       const protocol = hasCert ? "https" : "http";
       const host = hostname || "localhost";
@@ -504,7 +507,7 @@ class MyArtisan {
     envObj.APP_PORT = String(finalPort);
     if (!(await isPortAvailable(finalPort))) {
       console.error(
-        `Port ${finalPort} is already in use. Please choose a different port.`
+        `Port ${finalPort} is already in use. Please choose a different port.`,
       );
       Deno.exit(1);
     }
@@ -513,7 +516,7 @@ class MyArtisan {
       HOSTNAME || "",
       finalPort,
       hasCert,
-      "/"
+      "/",
     ).replace(/\/$/, "");
     const envPath: string | undefined | null = basePath(".env");
     // EnvUpdater.updateAppUrl(envPath as string, APP_URL);
@@ -560,8 +563,8 @@ class MyArtisan {
     console.log(
       `Provider file created at ${path.relative(
         Deno.cwd(),
-        appPath(`/Providers/${name}.ts`)
-      )}`
+        appPath(`/Providers/${name}.ts`),
+      )}`,
     );
   }
 
@@ -574,8 +577,8 @@ class MyArtisan {
     console.log(
       `Middleware file created at ${path.relative(
         Deno.cwd(),
-        appPath(`/Http/Middlewares/${name}.ts`)
-      )}`
+        appPath(`/Http/Middlewares/${name}.ts`),
+      )}`,
     );
   }
 
@@ -608,7 +611,7 @@ class MyArtisan {
     option: {
       model?: string;
     },
-    name: string
+    name: string,
   ) {
     const stub = isset(option.model)
       ? honovelPath("stubs/FactoryModel.stub")
@@ -623,8 +626,8 @@ class MyArtisan {
     console.log(
       `Factory file created at ${path.relative(
         Deno.cwd(),
-        databasePath(`factories/${name}.ts`)
-      )}`
+        databasePath(`factories/${name}.ts`),
+      )}`,
     );
   }
 
@@ -636,9 +639,7 @@ class MyArtisan {
       makeDir(pathName);
     }
     writeFile(view, "");
-    console.log(
-      `View file created at ${path.relative(Deno.cwd(), view)}`
-    );
+    console.log(`View file created at ${path.relative(Deno.cwd(), view)}`);
   }
 
   public async command(args: string[]): Promise<void> {
@@ -650,19 +651,33 @@ class MyArtisan {
       .option("--class <class:string>", "Specify the seeder class to run")
       .option(
         "--database <db:string>",
-        "Specify the database connection to use"
+        "Specify the database connection to use",
       )
       .action((options: { class?: string; database?: string }) =>
         this.runSeed.bind(this)({
           seederClass: options.class,
           db: options.database,
-        })
+        }),
       )
+
+      .command("install:driver", "Install optional database/cache drivers")
+      .option(
+        "--redis <client:string>",
+        "Redis client: ioredis|upstash|node-redis|deno-redis",
+      )
+      .option(
+        "--cache <driver:string>",
+        "Cache driver: memcached|dynamodb|mongodb",
+      )
+      .action((options: { redis?: string; cache?: string }) =>
+        this.installDriver(options),
+      )
+
       .command("key:generate", "Generate a new application key")
       .option("--force", "Force overwrite existing APP_KEY")
       .option(
         "--env <env:string>",
-        "Specify the environment name (e.g. staging, production)"
+        "Specify the environment name (e.g. staging, production)",
       )
       .action((options: { force?: boolean; env?: string }) => {
         const envPath = options.env ? `.env.${options.env}` : ".env";
@@ -672,34 +687,34 @@ class MyArtisan {
       .arguments("<name:string>")
       .option("--force", "Force overwrite existing config file")
       .action((options: { force?: boolean }, name: string) =>
-        this.createConfig.bind(this)(options, name)
+        this.createConfig.bind(this)(options, name),
       )
       .command("make:controller", "Generate a controller file")
       .arguments("<name:string>")
       .option(
         "--resource",
-        "Generate a resourceful controller (index, create, store, etc.)"
+        "Generate a resourceful controller (index, create, store, etc.)",
       )
       .action((options: { resource?: boolean }, name: string) =>
-        this.makeController.bind(this)(options, name)
+        this.makeController.bind(this)(options, name),
       )
       .command("make:factory", "Generate a factory file")
       .arguments("<name:string>")
       .option(
         "--model <model:string>",
-        "Specify the model to associate with the factory"
+        "Specify the model to associate with the factory",
       )
       .action((options: { model?: string }, name: string) =>
-        this.makeFactory.bind(this)(options, name)
+        this.makeFactory.bind(this)(options, name),
       )
       .command("make:migration", "Generate a migration file")
       .arguments("<name:string>")
       .option(
         "--table <table:string>",
-        "Specify the table to alter in the migration"
+        "Specify the table to alter in the migration",
       )
       .action((options: { table?: string }, name: string) =>
-        this.makeMigration(options, name)
+        this.makeMigration(options, name),
       )
       .command("migrate", "Run the database migrations")
       .option("--seed", "Seed the database after migration")
@@ -708,7 +723,7 @@ class MyArtisan {
       .option("--force", "Force the migration without confirmation")
       .option(
         "--seeder <seeder:string>",
-        "Specify a seeder class to run after migration"
+        "Specify a seeder class to run after migration",
       )
       .action((options: any) => {
         const db: string =
@@ -742,12 +757,12 @@ class MyArtisan {
             all?: boolean;
             pivot?: boolean;
           },
-          name: string
-        ) => this.makeModel(options, name)
+          name: string,
+        ) => this.makeModel(options, name),
       )
       .command(
         "make:provider",
-        "Generate a service provider class for the application"
+        "Generate a service provider class for the application",
       )
       .arguments("<name:string>")
       .action((_: unknown, name: string) => this.makeProvider(name))
@@ -766,8 +781,8 @@ class MyArtisan {
         console.log(
           `Seeder file created at ${path.relative(
             Deno.cwd(),
-            databasePath(`seeders/${name}.ts`)
-          )}`
+            databasePath(`seeders/${name}.ts`),
+          )}`,
         );
       })
 
@@ -813,7 +828,7 @@ class MyArtisan {
       .option("--force", "Force the fresh migration without confirmation")
       .option(
         "--seeder <seeder:string>",
-        "Specify a seeder class to run after fresh migration"
+        "Specify a seeder class to run after fresh migration",
       )
       .action((options: any) => {
         const db: string =
@@ -830,14 +845,14 @@ class MyArtisan {
       .option("--seed", "Seed the database after refresh")
       .option(
         "--step <step:number>",
-        "Number of steps to rollback before migrating"
+        "Number of steps to rollback before migrating",
       )
       .option("--path <path:string>", "Specify a custom migrations directory")
       .option("--db <db:string>", "Specify the database connection to use")
       .option("--force", "Force the refresh migration without confirmation")
       .option(
         "--seeder <seeder:string>",
-        "Specify a seeder class to run after refresh"
+        "Specify a seeder class to run after refresh",
       )
       .action((options: any) => {
         const db: string =
@@ -852,7 +867,7 @@ class MyArtisan {
       })
       .command(
         "publish:config",
-        "Build your configs in config/build/myConfig.ts"
+        "Build your configs in config/build/myConfig.ts",
       )
       .action(() => this.publishConfig.bind(this)())
       .command("serve", "Start the Honovel server")
@@ -863,29 +878,29 @@ class MyArtisan {
         default: "127.0.0.1",
       })
       .action((options: { port?: number | null | string; host: string }) =>
-        this.serve.bind(this)(options)
+        this.serve.bind(this)(options),
       )
       // for maintenance mode
       .command("down", "Put the application into maintenance mode")
       .option(
         "--message <message:string>",
-        "The message for the maintenance mode"
+        "The message for the maintenance mode",
       )
       .option(
         "--retry <retry:number>",
-        "Retry after seconds (adds Retry-After header)"
+        "Retry after seconds (adds Retry-After header)",
       )
       .option(
         "--allow <ip:string[]>",
-        "IP addresses allowed to access the app during maintenance"
+        "IP addresses allowed to access the app during maintenance",
       )
       .option(
         "--secret <key:string>",
-        "Secret bypass key for maintenance access"
+        "Secret bypass key for maintenance access",
       )
       .option(
         "--render <view:string>",
-        "Custom view to render during maintenance"
+        "Custom view to render during maintenance",
       )
       .option("--redirect <url:string>", "Redirect URL during maintenance mode")
       .action(
@@ -896,7 +911,7 @@ class MyArtisan {
           secret?: string;
           render?: string;
           redirect?: string;
-        }) => this.down.bind(this)(options)
+        }) => this.down.bind(this)(options),
       )
       .command("up", "Bring the application out of maintenance mode")
       .action(() => this.up.bind(this)())
@@ -949,6 +964,80 @@ class MyArtisan {
 
     console.log("Application is now out of maintenance mode.");
   }
+
+  private async installDriver(options: {
+    redis?: string;
+    cache?: string;
+    database?: string;
+  }) {
+    const denoJsonPath = basePath("deno.json");
+    const denoJson = JSON.parse(getFileContents(denoJsonPath));
+    if (options.redis) {
+      const redisDrivers: Record<string, string> = {
+        ioredis: "npm:ioredis@^5.9.3",
+        upstash: "npm:@upstash/redis@^1.36.2",
+        "node-redis": "npm:redis@^5.11.0",
+        "deno-redis": "https://deno.land/x/redis@v0.29.4/mod.ts",
+      };
+
+      denoJson.imports[
+        options.redis === "upstash" ? "@upstash/redis" : options.redis
+      ] = redisDrivers[options.redis];
+      // execute deno install command to install the driver
+      const cmd = new Deno.Command("deno", {
+        args: ["add", redisDrivers[options.redis || "ioredis"]],
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      const process = cmd.spawn();
+      const status = await process.status;
+      if (status.code === 0) {
+        console.log(
+          "Driver installed successfully. Please restart the server if it's running.",
+        );
+      }
+    } else if (options.cache) {
+      const cacheDrivers: Record<string, string> = {
+        memcached: "jsr:@avroit/memcached@^0.0.4",
+        dynamodb: "npm:@aws-sdk/client-dynamodb@^3.995.0",
+        mongodb: "npm:mongodb@^6.21.0",
+      };
+
+      denoJson.imports[options.cache] = cacheDrivers[options.cache];
+      // execute deno install command to install the driver
+      const cmd = new Deno.Command("deno", {
+        args: ["add", cacheDrivers[options.cache || "memcached"]],
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      const process = cmd.spawn();
+      const status = await process.status;
+      if (status.code === 0) {
+        console.log(
+          "Driver installed successfully. Please restart the server if it's running.",
+        );
+      }
+    } else if (options.database) {
+      const databaseDrivers: Record<string, string> = {
+        mongodb: "npm:mongodb@^6.21.0",
+      };
+
+      denoJson.imports[options.database] = databaseDrivers[options.database];
+      // execute deno install command to install the driver
+      const cmd = new Deno.Command("deno", {
+        args: ["add", databaseDrivers[options.database || "mongodb"]],
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      const process = cmd.spawn();
+      const status = await process.status;
+      if (status.code === 0) {
+        console.log(
+          "Driver installed successfully. Please restart the server if it's running.",
+        );
+      }
+    }
+  }
 }
 
 interface ModuleMigration {
@@ -958,7 +1047,7 @@ interface ModuleMigration {
 
 export async function loadMigrationModules(
   modulePath: string = "database/migrations",
-  extractModule: string[] = []
+  extractModule: string[] = [],
 ): Promise<ModuleMigration[]> {
   const modules: ModuleMigration[] = [];
   const migrationsPath = basePath(modulePath);
