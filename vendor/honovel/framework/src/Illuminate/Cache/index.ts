@@ -543,6 +543,7 @@ class MemoryStore extends AbstractStore {
   #initialized = false;
   private async init() {
     if (this.#initialized) return;
+    this.#initialized = true;
     try {
       const { InMemoryCached } = await import("@avroit/memcached");
       this.store = new InMemoryCached();
@@ -559,12 +560,14 @@ class MemoryStore extends AbstractStore {
     }
   }
   async get(key: string): Promise<any> {
+    await this.init();
     const newKey = this.validateKey(key);
     const cacheItem = await this.store.get(newKey);
     if (!isset(cacheItem)) return null; // Key does not exist
     return jsonDecode(cacheItem);
   }
   async put(key: string, value: any, seconds: number): Promise<void> {
+    await this.init();
     value = jsonEncode(value);
     const newKey = this.validateKey(key);
     const expiresAt =
@@ -575,10 +578,12 @@ class MemoryStore extends AbstractStore {
     await this.store.set(newKey, value, expiresAt);
   }
   async forget(key: string): Promise<void> {
+    await this.init();
     const newKey = this.validateKey(key);
     await this.store.delete(newKey);
   }
   async flush(): Promise<void> {
+    await this.init();
     await this.store.flush();
   }
   getPrefix(): string {
