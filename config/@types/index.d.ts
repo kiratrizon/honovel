@@ -259,62 +259,46 @@ type DatabaseConnections = {
     | MongoConnectionConfig;
 };
 
-type RedisClient = "ioredis" | "node-redis" | "upstash" | "deno-redis";
-
-export type RedisConfigure<T extends RedisClient> = T extends "deno-redis"
-  ? {
-      host: string;
-      port: number;
-      password?: string;
-      db?: number;
-      username?: string;
-      tls?: boolean;
-      options?: Record<string, unknown>;
-    }
-  : T extends "upstash"
-    ? {
-        upstashUrl: string;
-        upstashToken: string;
-      }
-    : T extends "ioredis"
-      ? {
-          ioredisUrl: string;
-        }
-      : T extends "node-redis"
-        ? {
-            nodeRedisUrl: string;
-          }
-        : never;
-
 type RedisUpstash = {
-  client: "upstash";
-  default: string;
-  connections: Record<string, RedisConfigure<"upstash">>;
+  driver: "upstash";
+  upstashUrl: string;
+  upstashToken: string;
 };
 
 type RedisDenoRedis = {
-  client: "deno-redis";
-  default: string;
-  connections: Record<string, RedisConfigure<"deno-redis">>;
+  driver: "deno-redis";
+  host: string;
+  port: number;
+  password?: string;
+  db?: number;
+  username?: string;
+  tls?: boolean;
+  options?: Record<string, unknown>;
 };
 
 type RedisNodeRedis = {
-  client: "node-redis";
-  default: string;
-  connections: Record<string, RedisConfigure<"node-redis">>;
+  driver: "node-redis";
+  nodeRedisUrl: string;
 };
 
 type RedisIORedis = {
-  client: "ioredis";
-  default: string;
-  connections: Record<string, RedisConfigure<"ioredis">>;
+  driver: "ioredis";
+  ioredisUrl: string;
 };
 
-type RedisConfig =
-  | RedisUpstash
-  | RedisDenoRedis
-  | RedisNodeRedis
-  | RedisIORedis;
+export type RedisConfigure = {
+  ioredis: RedisIORedis;
+  upstash: RedisUpstash;
+  "node-redis": RedisNodeRedis;
+  "deno-redis": RedisDenoRedis;
+};
+
+export type RedisClient = "ioredis" | "upstash" | "node-redis" | "deno-redis";
+
+export type RedisConfig = {
+  default: string;
+  connections: Record<string, RedisConfigure[RedisClient]>;
+};
 
 interface DatabaseConfig {
   default: string;
