@@ -138,6 +138,7 @@ import { Authenticatable } from "Illuminate/Contracts/Auth/index.ts";
 import { ServiceProvider } from "Illuminate/Support/index.ts";
 import { IStorage } from "Illuminate/Support/Facades/Storage.ts";
 import { AbstractStore } from "Illuminate/Cache/index.ts";
+import { TLSOptions } from "@db/pgsql";
 
 /**
  * Supported database drivers
@@ -255,6 +256,8 @@ export interface PostgresConnectionConfig {
   application_name?: string;
   /** Additional PostgreSQL connection options */
   options?: Record<string, unknown>;
+  /** TLS configuration */
+  tls?: TLSOptions;
 }
 
 interface SQLiteConnectionConfig {
