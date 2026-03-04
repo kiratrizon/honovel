@@ -254,8 +254,6 @@ export interface PostgresConnectionConfig {
   searchPath?: string | string[];
   /** Application identifier shown in pg_stat_activity */
   application_name?: string;
-  /** Additional PostgreSQL connection options */
-  options?: Record<string, unknown>;
   /** TLS configuration */
   tls?: TLSOptions;
 }
