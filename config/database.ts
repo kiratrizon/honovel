@@ -21,6 +21,18 @@ const constant: DatabaseConfig = {
       driver: "sqlite",
       database: databasePath("database.sqlite"),
     },
+    mysql2: {
+      driver: "mysql",
+      host: env("LOCAL_DB_HOST", "127.0.0.1"),
+      port: env("LOCAL_DB_PORT", 3307),
+      user: env("LOCAL_DB_USERNAME", "kira"),
+      password: env("LOCAL_DB_PASSWORD", "asterda23"),
+      database: env("LOCAL_DB_DATABASE", "honovel"),
+      charset: "utf8mb4",
+      options: {
+        maxConnection: 10,
+      },
+    },
   },
 
   redis: {
