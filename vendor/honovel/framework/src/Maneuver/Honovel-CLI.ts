@@ -112,13 +112,22 @@ class MyArtisan {
       resource?: boolean;
       all?: boolean;
       pivot?: boolean;
+      table?: string;
     },
     name: string,
   ) {
     const modelPath = basePath(`app/Models/${name}.ts`);
     const stubPath = honovelPath("stubs/Model.stub");
     const stubContent = getFileContents(stubPath);
-    const modelContent = stubContent.replace(/{{ ClassName }}/g, name);
+    let modelContent = stubContent.replace(/{{ ClassName }}/g, name);
+
+    // If a custom table is specified, add the _table property
+    if (options.table) {
+      modelContent = modelContent.replace(
+        /protected static override _fillable = \[\];/,
+        `protected static override _table = "${options.table}";\n\n  protected static override _fillable = [];`,
+      );
+    }
 
     writeFile(modelPath, modelContent);
     console.log(
@@ -126,7 +135,8 @@ class MyArtisan {
     );
 
     if (options.migration || options.all) {
-      this.makeMigration({}, generateTableName(name));
+      const tableName = options.table || generateTableName(name);
+      this.makeMigration({}, tableName);
     }
 
     if (options.controller || options.all) {
@@ -340,6 +350,152 @@ class MyArtisan {
         db: options.db,
       });
     }
+  }
+
+  private async rollbackMigrations(options: {
+    step?: number;
+    path?: string;
+    db: string;
+    force: boolean;
+  }) {
+    config({ key: "database.default", value: options.db });
+    if (!options.force) {
+      await this.askIfDBNotExist(options.db);
+    }
+    await this.createMigrationTable(options.db);
+
+    const step = options.step || 1;
+
+    const batchRows = await DB.connection(options.db)
+      .table("migrations")
+      .select("batch")
+      .groupBy("batch")
+      .orderBy("batch", "desc")
+      .limit(step)
+      .get();
+
+    if (batchRows.length === 0) {
+      console.info("Nothing to rollback.");
+      return;
+    }
+
+    const batches = batchRows.map((row) => row.batch);
+    const batchMigrations = await DB.connection(options.db)
+      .table("migrations")
+      .whereIn("batch", batches)
+      .select("name")
+      .orderBy("id", "desc")
+      .get();
+
+    const extractModule = batchMigrations.map((row) => row.name as string);
+    const modules = await loadMigrationModules(options.path, extractModule);
+
+    if (modules.length === 0) {
+      console.info("No migrations found to rollback.");
+      return;
+    }
+
+    console.info(`Rolling back ${modules.length} migration(s)...`);
+    for (const module of modules) {
+      const { name, migration } = module;
+      migration.setConnection(options.db);
+      await migration.run("down");
+      await DB.connection(options.db)
+        .table("migrations")
+        .where("name", name)
+        .delete();
+      console.log(`Rolled back: ${name}`);
+    }
+
+    console.log(`Rollback completed successfully.`);
+  }
+
+  private async resetMigrations(options: {
+    path?: string;
+    db: string;
+    force: boolean;
+  }) {
+    config({ key: "database.default", value: options.db });
+    if (!options.force) {
+      await this.askIfDBNotExist(options.db);
+    }
+    await this.createMigrationTable(options.db);
+
+    const allMigrations = await DB.connection(options.db)
+      .table("migrations")
+      .select("name")
+      .orderBy("id", "desc")
+      .get();
+
+    if (allMigrations.length === 0) {
+      console.info("Nothing to reset.");
+      return;
+    }
+
+    const extractModule = allMigrations.map((row) => row.name as string);
+    const modules = await loadMigrationModules(options.path, extractModule);
+
+    if (modules.length === 0) {
+      console.info("No migrations found to reset.");
+      return;
+    }
+
+    console.info(`Resetting ${modules.length} migration(s)...`);
+    for (const module of modules) {
+      const { name, migration } = module;
+      migration.setConnection(options.db);
+      await migration.run("down");
+      await DB.connection(options.db)
+        .table("migrations")
+        .where("name", name)
+        .delete();
+      console.log(`Rolled back: ${name}`);
+    }
+
+    console.log(`Reset completed successfully.`);
+  }
+
+  private async migrationStatus(options: { path?: string; db: string }) {
+    config({ key: "database.default", value: options.db });
+    await this.createMigrationTable(options.db);
+
+    const allModules = await loadMigrationModules(options.path);
+    const ranMigrations = await DB.connection(options.db)
+      .table("migrations")
+      .select("name", "batch")
+      .orderBy("batch", "asc")
+      .orderBy("id", "asc")
+      .get();
+
+    const ranMigrationsMap = new Map(
+      ranMigrations.map((row) => [row.name as string, row.batch as number]),
+    );
+
+    console.log(
+      "\n+------+------------------------------------------------+-------+",
+    );
+    console.log(
+      "| Ran? | Migration                                      | Batch |",
+    );
+    console.log(
+      "+------+------------------------------------------------+-------+",
+    );
+
+    for (const module of allModules) {
+      const batch = ranMigrationsMap.get(module.name);
+      const ran = batch !== undefined;
+      const status = ran ? " Yes " : " No  ";
+      const batchStr = ran ? String(batch).padStart(5, " ") : "     ";
+      const migrationName =
+        module.name.length > 46
+          ? module.name.substring(0, 43) + "..."
+          : module.name.padEnd(46, " ");
+      console.log(`| ${status} | ${migrationName} | ${batchStr} |`);
+    }
+
+    console.log(
+      "+------+------------------------------------------------+-------+\n",
+    );
   }
 
   private async createMigrationTable(connection: string) {
@@ -747,6 +903,7 @@ class MyArtisan {
       .option("-r, --resource", "Make the controller resourceful")
       .option("--all", "Generate migration, factory, and controller")
       .option("--pivot", "Indicate the model is a pivot table")
+      .option("--table <table:string>", "Specify the table name for the model")
       .action(
         (
           options: {
@@ -756,6 +913,7 @@ class MyArtisan {
             resource?: boolean;
             all?: boolean;
             pivot?: boolean;
+            table?: string;
           },
           name: string,
         ) => this.makeModel(options, name),
@@ -864,6 +1022,50 @@ class MyArtisan {
           db,
           force: options.force || false,
         });
+      })
+      .command("migrate:rollback", "Rollback the last database migration")
+      .option(
+        "--step <step:number>",
+        "Number of migrations to rollback (default: 1)",
+      )
+      .option("--path <path:string>", "Specify a custom migrations directory")
+      .option("--db <db:string>", "Specify the database connection to use")
+      .option("--force", "Force the rollback without confirmation")
+      .action((options: any) => {
+        const db: string =
+          (options.db as string) ||
+          (config("database").default as string) ||
+          "mysql";
+        return this.rollbackMigrations({
+          ...options,
+          db,
+          force: options.force || false,
+        });
+      })
+      .command("migrate:reset", "Rollback all database migrations")
+      .option("--path <path:string>", "Specify a custom migrations directory")
+      .option("--db <db:string>", "Specify the database connection to use")
+      .option("--force", "Force the reset without confirmation")
+      .action((options: any) => {
+        const db: string =
+          (options.db as string) ||
+          (config("database").default as string) ||
+          "mysql";
+        return this.resetMigrations({
+          ...options,
+          db,
+          force: options.force || false,
+        });
+      })
+      .command("migrate:status", "Show the status of each migration")
+      .option("--path <path:string>", "Specify a custom migrations directory")
+      .option("--db <db:string>", "Specify the database connection to use")
+      .action((options: any) => {
+        const db: string =
+          (options.db as string) ||
+          (config("database").default as string) ||
+          "mysql";
+        return this.migrationStatus({ ...options, db });
       })
       .command(
         "publish:config",
