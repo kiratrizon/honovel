@@ -137,8 +137,8 @@ import { SslOptions } from "mysql2";
 import { Authenticatable } from "Illuminate/Contracts/Auth/index.ts";
 import { ServiceProvider } from "Illuminate/Support/index.ts";
 import { IStorage } from "Illuminate/Support/Facades/Storage.ts";
-import { AbstractStore } from "Illuminate/Cache/index.ts";
 import { TLSOptions } from "@db/pgsql";
+import AbstractStore from "Illuminate/Cache/Stores/AbstractStore.ts";
 
 /**
  * Supported database drivers
