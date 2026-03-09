@@ -10,7 +10,7 @@ import { ContentfulStatusCode } from "http-status";
 import { myError } from "HonoHttp/builder.ts";
 import { MiddlewareLikeClass } from "Illuminate/Foundation/Http/index.ts";
 import { SQLError } from "Illuminate/Database/Query/index.ts";
-import { Model } from "Illuminate/Database/Eloquent/index.ts";
+import Model from "Illuminate/Database/Eloquent/Model.ts";
 import { ModelAttributes } from "../../../../@types/declaration/Base/IBaseModel.d.ts";
 import { ValidationException } from "Illuminate/Validation/ValidationException.ts";
 import { TagContract } from "edge.js/types";
