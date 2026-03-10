@@ -19,7 +19,6 @@ import ValidateSignature from "../../Routing/Middleware/ValidateSignature.ts";
 import ThrottleRequests from "../../Routing/Middleware/ThrottleRequests.ts";
 import EnsureEmailIsVerified from "../../Auth/Middleware/EnsureEmailIsVerified.ts";
 import PayloadParser from "../Http/Middleware/PayloadParser.ts";
-import Application from "../Application.ts";
 
 export interface MiddlewareLikeInstance {
   handle?: HttpMiddleware;
@@ -76,7 +75,7 @@ export default class Middleware {
     return this;
   }
 
-  public static alias(aliases: Record<string, MiddlewareLike>) {
+  public static alias(aliases: Record<string, MiddlewareLikeClass>) {
     Object.assign(this.aliases, aliases);
     return this;
   }
