@@ -17,6 +17,3 @@ node_modules
 /.vite
 /deno.jsonc
 /tmp
-
-.github
-.specify
