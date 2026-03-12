@@ -201,7 +201,7 @@ class Server {
 
     } catch (_e) {
       console.error("Application not found", _e);
-      if (isset(env("DENO_DEPLOYMENT_ID")) && env("DENO_DEPLOYMENT_ID") !== "") {
+      if (!isset(env("DENO_DEPLOYMENT_ID")) || empty(env("DENO_DEPLOYMENT_ID"))) {
         Deno.exit(1);
       }
     }
@@ -477,24 +477,24 @@ class Server {
             }
           }
 
-          const warmUpFallbacks: TFallbackMiddleware[] = [
-            ...globalMiddlewareFallback,
-            ...routeGroupMiddlewareFallback,
-          ];
-          const warmUpFallbacksArr: MiddlewareHandler[] = [];
-          warmUpFallbacks.forEach((fb, index) => {
-            warmUpFallbacksArr.unshift(toFallback([index + 1, fb]));
-          });
+          // const warmUpFallbacks: TFallbackMiddleware[] = [
+          //   ...globalMiddlewareFallback,
+          //   ...routeGroupMiddlewareFallback,
+          // ];
+          // const warmUpFallbacksArr: MiddlewareHandler[] = [];
+          // warmUpFallbacks.forEach((fb, index) => {
+          //   warmUpFallbacksArr.unshift(toFallback([index + 1, fb]));
+          // });
 
-          const warmUpBuilds = [
-            toDispatch({ args: warmUpdispatch, debugString: "" }, []),
-            ...warmUpFallbacksArr,
-            returnResponse,
-          ];
-          const warmUpApp = await this.generateNewApp();
-          // @ts-ignore //
-          warmUpApp.get("/__warmup", ...warmUpBuilds);
-          byEndpointsRouter.route("/", warmUpApp);
+          // const warmUpBuilds = [
+          //   toDispatch({ args: warmUpdispatch, debugString: "" }, []),
+          //   ...warmUpFallbacksArr,
+          //   returnResponse,
+          // ];
+          // const warmUpApp = await this.generateNewApp();
+          // // @ts-ignore //
+          // warmUpApp.get("/__warmup", ...warmUpBuilds);
+          // byEndpointsRouter.route("/", warmUpApp);
 
           // for groups
           if (isset(groups) && !empty(groups) && isObject(groups)) {
@@ -696,6 +696,8 @@ class Server {
           //   Route.fallbackFn = null; // reset after applying
           // }
           this.app.route(routePrefix, byEndpointsRouter);
+        } else {
+          console.error("No routes found");
         }
       }
     }

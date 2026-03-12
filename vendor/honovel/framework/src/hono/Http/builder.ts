@@ -6,7 +6,11 @@ export async function myError(
   code: ContentfulStatusCode = 404,
   message: string = "Not Found"
 ) {
-  const {request} = c.get("myHono");
+  const extractMyHono = c.get("myHono");
+  const request = extractMyHono?.request;
+  if (!request) {
+    return c.json({ message }, code);
+  }
   if (request.expectsJson() || request.ajax()) {
         return c.json(
       {

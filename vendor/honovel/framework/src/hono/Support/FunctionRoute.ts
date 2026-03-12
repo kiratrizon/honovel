@@ -1403,7 +1403,7 @@ export async function handleAction(
           return request;
         },
         config: function (key: string, defaultValue: unknown = null) {
-          return c.get("myHono").Configure.read(key, defaultValue);
+          return config(key, defaultValue);
         },
         auth: function () {
           return c.get("myHono").Auth;

@@ -1,10 +1,19 @@
 import Middleware from "./Configuration/Middleware.ts";
 
+type RouterLoader = () => Promise<any>;
+
+export interface RoutingConfig {
+  web?: RouterLoader;
+  api?: RouterLoader;
+  commands?: RouterLoader;
+  health?: string;
+}
+
 export default class Application {
   private static base: string;
   private static middleware: typeof Middleware = Middleware;
 
-  private static routers: Record<string, () => Promise<any>> = {};
+  private static routers: RoutingConfig = {};
 
   static withMiddleware(cb: (middleware: typeof Middleware) => void) {
     const mw = this.middleware;
@@ -12,9 +21,9 @@ export default class Application {
     return this;
   }
 
-  static withRouting(obj: Record<string, () => Promise<any>>) {
+  static withRouting(obj: RoutingConfig) {
     for (const [key, value] of Object.entries(obj)) {
-      this.routers[key] = value;
+      this.routers[key as keyof RoutingConfig] = value;
     }
     return this;
   }
