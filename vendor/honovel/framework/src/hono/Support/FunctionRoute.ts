@@ -4,7 +4,7 @@ import HonoClosure from "HonoHttp/HonoClosure.ts";
 import { IMyConfig } from "./MethodRoute.ts";
 import HonoDispatch from "HonoHttp/HonoDispatch.ts";
 import HttpHono from "HttpHono";
-import { HttpException, DDError } from "../../Maneuver/HonovelErrors.ts";
+import { DDError } from "../../Maneuver/HonovelErrors.ts";
 import { ContentfulStatusCode } from "http-status";
 import { myError } from "HonoHttp/builder.ts";
 import { SQLError } from "Illuminate/Database/Query/index.ts";
@@ -22,6 +22,8 @@ import HRequest from "HonoHttp/HonoRequest.d.ts";
 import BindingRegistry from "../Core/BindingRegistry.ts";
 import HonoRequest from "HonoHttp/HonoRequest.ts";
 import { MiddlewareLikeClass } from "Illuminate/Foundation/Configuration/Middleware.ts";
+import HttpException from "Illuminate/Foundation/HttpExecptions/HttpException.ts";
+import Exception from "Illuminate/Foundation/Execptions/Exception.ts";
 
 export const regexObj = {
   number: /^\d+$/,
@@ -1319,12 +1321,30 @@ async function handleErrors(
     } else {
       resp = c.html(data.html, 200);
     }
-  } else if (e instanceof HttpException) {
-    if (request.expectsJson()) {
-      resp = e.toJson();
+  } else if (e instanceof Exception) {
+    // for http exceptions
+    const exception = application.getException(e);
+    if (exception) {
+      const firstResp = await exception.cb(c.get("myHono"));
+      if (firstResp instanceof RedirectResponse) {
+        saveSessionIfRedirect(request);
+      }
+      // @ts-ignore //
+      const cookies = firstResp.getCookies();
+      for (const [name, [value, options]] of Object.entries(cookies)) {
+        c.get("myHono").Cookie.queue(name, value, options);
+      }
+      // @ts-ignore //
+      const res = firstResp.toResponse();
+
+      resp = convertToResponse(c, res);
     } else {
-      const data = isString(e.msg) ? e.msg : `Error: ${e.code} - ${e.msg}`;
-      resp = await myError(c, e.code as ContentfulStatusCode, data);
+      const code = e.httpCode;
+      if (request.expectsJson()) {
+        resp = c.json({ message: e.message }, code);
+      } else {
+        resp = c.html(renderErrorHtml(e), code);
+      }
     }
   } else if (e instanceof SQLError) {
     if (request.expectsJson()) {

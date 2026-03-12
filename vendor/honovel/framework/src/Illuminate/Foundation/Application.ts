@@ -1,4 +1,8 @@
+import { ICallback } from "../../../../@types/declaration/IRoute.d.ts";
 import Middleware from "./Configuration/Middleware.ts";
+import Exception from "./Execptions/Exception.ts";
+import Exceptions, { IExceptionCallback } from "./Execptions/Exceptions.ts";
+import HttpException from "./HttpExecptions/HttpException.ts";
 
 type RouterLoader = () => Promise<any>;
 
@@ -10,7 +14,6 @@ export interface RoutingConfig {
 }
 
 export default class Application {
-  private static base: string;
   private static middleware: typeof Middleware = Middleware;
 
   private static routers: RoutingConfig = {};
@@ -29,16 +32,33 @@ export default class Application {
   }
 
   static create(){
-    const app = new this();
-    return app;
+    return new this();
+  }
+
+  static withExceptions(cb: (exceptions: typeof Exceptions) => void) {
+    cb(Exceptions);
+    return this;
   }
 
   public getRouter() {
     const data = {
       middleware: new Application.middleware(),
-      routers: Application.routers,
-      base: Application.base,
+      routers: Application.routers
     }
     return data;
+  }
+
+  private static exceptions: Record<string, { exception: typeof HttpException | typeof Exception, cb: IExceptionCallback }> = {};
+  public addException(exception: typeof HttpException | typeof Exception, cb: IExceptionCallback) {
+    if (!Application.exceptions[exception.name]) {
+      Application.exceptions[exception.name] = {
+        exception,
+        cb
+      };
+    }
+  }
+
+  public getException(name: Exception) {
+    return Application.exceptions[name.name];
   }
 }

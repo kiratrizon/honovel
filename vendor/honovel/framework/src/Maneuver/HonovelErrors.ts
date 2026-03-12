@@ -175,4 +175,11 @@ export class HttpException extends Error {
   public get msg(): string | Record<string, unknown> {
     return this.mess;
   }
+
+  public render(): Record<string, any> | null {
+    return {
+      message: this.msg,
+      code: this.code,
+    };
+  }
 }

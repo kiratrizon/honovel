@@ -50,24 +50,6 @@ declare global {
 
   function route(name: string, params?: Record<string, unknown>): string;
 
-  /**
-   * HttpHono interface with all the request data.
-   * This interface is used to pass the request data to the controller methods.
-   * It contains the HonoRequest object that encapsulates the HTTP request data.
-   */
-  interface IHttpHono {
-    /**
-     * The HonoRequest object that encapsulates the HTTP request data.
-     */
-    get request(): HonoRequest;
-
-    /**
-     * Access the session data.
-     * This is used to manage user sessions and store session variables.
-     */
-    get session(): SessionModifier;
-  }
-
   type HttpMiddleware = (
     myHono: HttpHono,
     // @ts-ignore //

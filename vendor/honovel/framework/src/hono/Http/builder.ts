@@ -20,6 +20,7 @@ export async function myError(
     );
   }
 
+  // console.trace("myError");
   // this is for html
   if (!(await pathExist(viewPath(`error/${code}.edge`)))) {
     const content = getFileContents(honovelPath("hono/defaults/abort.stub"));

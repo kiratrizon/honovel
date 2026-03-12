@@ -1,8 +1,18 @@
 import Application from "Illuminate/Foundation/Application.ts";
+import NotFoundHttpException from "Illuminate/Foundation/HttpExecptions/NotFoundHttpException.ts";
 
 export default Application.withRouting({
   web: async () => await import("../routes/web.ts"),
   // api: async () => await import("../routes/api.ts"),
 }).withMiddleware((middleware)=>{
   
-}).create();
+})
+.withExceptions((exceptions)=>{
+  exceptions.render(NotFoundHttpException, async ({request}) => {
+    if (request.expectsJson()) {
+      return response().json({ message: "Not Found" }, 404);
+    }
+    return response().html("Not Found", 404);
+  });
+})
+.create();

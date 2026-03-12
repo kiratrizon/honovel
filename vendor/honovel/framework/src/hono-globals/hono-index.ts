@@ -1,10 +1,11 @@
 import "./index.ts";
 
 import HonoView from "HonoHttp/HonoView.ts";
-import { HttpException, DDError } from "../Maneuver/HonovelErrors.ts";
+import { DDError } from "../Maneuver/HonovelErrors.ts";
 import HonoRedirect from "HonoHttp/HonoRedirect.ts";
 import HonoResponseV2 from "HonoHttp/HonoResponse.ts";
 import Event from "Illuminate/Events/index.ts";
+import HttpException from "Illuminate/Foundation/HttpExecptions/HttpException.ts";
 
 globalFn("response", function (html = null, status = 200) {
   if (!isset(html)) {
@@ -27,7 +28,11 @@ globalFn("dd", (...args: unknown[]) => {
 });
 
 globalFn("abort", (statusCode = 500, message = null) => {
-  throw new HttpException(statusCode, message);
+  const exception =  new HttpException(statusCode);
+  if (isset(message)) {
+    exception.setMessage(message);
+  }
+  throw exception;
 });
 
 globalFn("redirect", (url = null) => {

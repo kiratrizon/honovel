@@ -179,7 +179,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    config({ key: "database.default", value: options.db });
+    
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -225,7 +225,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    config({ key: "database.default", value: options.db });
+    
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -272,7 +272,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    config({ key: "database.default", value: options.db });
+    
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -358,7 +358,7 @@ class MyArtisan {
     db: string;
     force: boolean;
   }) {
-    config({ key: "database.default", value: options.db });
+    
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -415,7 +415,7 @@ class MyArtisan {
     db: string;
     force: boolean;
   }) {
-    config({ key: "database.default", value: options.db });
+    
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -456,7 +456,7 @@ class MyArtisan {
   }
 
   private async migrationStatus(options: { path?: string; db: string }) {
-    config({ key: "database.default", value: options.db });
+    
     await this.createMigrationTable(options.db);
 
     const allModules = await loadMigrationModules(options.path);

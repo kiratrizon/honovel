@@ -21,6 +21,10 @@ const constant: DatabaseConfig = {
       driver: "sqlite",
       database: databasePath("database.sqlite"),
     },
+    sqlite2: {
+      driver: "sqlite",
+      database: databasePath("database2.sqlite"),
+    },
     mysql2: {
       driver: "mysql",
       host: env("LOCAL_DB_HOST", "127.0.0.1"),
