@@ -58,7 +58,7 @@ export default class Application {
     }
   }
 
-  public getException(name: Exception) {
-    return Application.exceptions[name.name];
+  public getException(exception: Exception) {
+    return Application.exceptions[exception.name];
   }
 }

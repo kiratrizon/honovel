@@ -1,8 +1,8 @@
 import HttpException from "./HttpException.ts";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 export default class UnsupportedMediaTypeHttpException extends HttpException {
-    constructor(message: string, httpCode: ContentfulStatusCode = 415, headers: Record<string, string> = {}) {
-        super(message, httpCode, headers);
+    constructor(message?: string, headers: Record<string, string> = {}, httpCode: ContentfulStatusCode = 415) {
+        super(message, headers, httpCode);
         this.name = "UnsupportedMediaTypeHttpException";
     }
 }   

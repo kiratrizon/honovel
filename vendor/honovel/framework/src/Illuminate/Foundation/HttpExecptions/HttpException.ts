@@ -139,20 +139,11 @@ export default class HttpException extends Exception {
         510: "Not Extended",
         511: "Network Authentication Required",
       };
-    constructor(message: string, httpCode: ContentfulStatusCode = 500, private headers: Record<string, string> = {}) {
-        super(message, httpCode);
-        this.headers = headers;
-        this.name = "HttpException";
-    }
-
-    public getHeaders(): Record<string, string> {
-        return this.headers;
-    }
-
-    public setHeaders(headers: Record<string, string>): void {
-        Object.assign(this.headers, headers);
-    }
-    public setMessage(message: string): void {
-        this.message = message;
+    constructor(message?: string, headers: Record<string, string> = {}, httpCode: ContentfulStatusCode = 500,) {
+      if (!isset(message)) {
+        message = HttpException.httpStatusMessages[httpCode as HttpStatusCodeValue];
+      }
+      super(message, httpCode, headers);
+      this.name = "HttpException";
     }
 }

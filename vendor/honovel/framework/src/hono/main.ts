@@ -20,6 +20,8 @@ import {
   toFallback,
   returnResponse,
   toNotfound,
+  saveSessionIfRedirect,
+  convertToResponse,
 } from "./Support/FunctionRoute.ts";
 import { IMyConfig } from "./Support/MethodRoute.ts";
 import { honoSession } from "HonoHttp/HonoSession.ts";
@@ -116,6 +118,8 @@ import {
   registerRoute,
   buildRouteUrl,
 } from "./Support/RouteHelpers.ts";
+import NotFoundHttpException from "Illuminate/Foundation/HttpExecptions/NotFoundHttpException.ts";
+import { RedirectResponse } from "HonoHttp/HonoResponse.ts";
 
 const myStaticDefaults: MiddlewareHandler[] = [
   serveStatic({ root: path.relative(Deno.cwd(), publicPath()) }),
@@ -705,6 +709,25 @@ class Server {
 
   private static endInit() {
     this.app.notFound(async function (c: MyContext) {
+      const notFoundInstance = new NotFoundHttpException();
+      // find if the exception exist in the application
+      const exception = application?.getException(notFoundInstance);
+      const myHono = c.get("myHono");
+      if (exception && myHono) {
+        const firstResp = await exception.cb(myHono);
+        if (firstResp instanceof RedirectResponse) {
+          saveSessionIfRedirect(myHono.request);
+        }
+        // @ts-ignore //
+        const cookies = firstResp.getCookies();
+        for (const [name, [value, options]] of Object.entries(cookies)) {
+          myHono.Cookie.queue(name, value, options);
+        }
+        // @ts-ignore //
+        const res = firstResp.toResponse();
+  
+        return convertToResponse(c, res);
+      }
       return await myError(c);
     });
 

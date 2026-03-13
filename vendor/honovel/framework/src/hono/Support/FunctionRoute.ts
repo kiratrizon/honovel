@@ -1324,15 +1324,16 @@ async function handleErrors(
   } else if (e instanceof Exception) {
     // for http exceptions
     const exception = application.getException(e);
-    if (exception) {
-      const firstResp = await exception.cb(c.get("myHono"));
+    const myHono = c.get("myHono");
+    if (exception && myHono) {
+      const firstResp = await exception.cb(myHono);
       if (firstResp instanceof RedirectResponse) {
         saveSessionIfRedirect(request);
       }
       // @ts-ignore //
       const cookies = firstResp.getCookies();
       for (const [name, [value, options]] of Object.entries(cookies)) {
-        c.get("myHono").Cookie.queue(name, value, options);
+        myHono.Cookie.queue(name, value, options);
       }
       // @ts-ignore //
       const res = firstResp.toResponse();
@@ -1635,7 +1636,7 @@ export async function handleAction(
   }
 }
 
-function saveSessionIfRedirect(request: HRequest) {
+export function saveSessionIfRedirect(request: HRequest) {
   const sessionFlashData = request.session.get(
     "_flash",
   ) as SessionDataTypes["_flash"];
@@ -1656,4 +1657,32 @@ export function convertToResponse(c: MyContext, res: Response): Response {
     Object.fromEntries(res.headers),
   );
   return newRes;
+}
+
+export async function exceptionToResponse(c: MyContext, exception: Exception): Promise<Response> {
+  const myHono = c.get("myHono");
+  const getException = application.getException(exception);
+  if (getException && myHono) {
+    const firstResp = await getException.cb(myHono);
+    if (firstResp instanceof RedirectResponse) {
+      saveSessionIfRedirect(myHono.request);
+    }
+    // @ts-ignore //
+    const cookies = firstResp.getCookies();
+    for (const [name, [value, options]] of Object.entries(cookies)) {
+      myHono.Cookie.queue(name, value, options);
+    }
+    // @ts-ignore //
+    const res = firstResp.toResponse();
+    return convertToResponse(c, res);
+  }
+  return await exceptionNotExistToResponse(c, exception);
+}
+
+async function exceptionNotExistToResponse(c: MyContext, exception: Exception): Promise<Response> {
+  const myHono = c.get("myHono");
+  if (myHono) {
+    return await myError(c, exception.httpCode, exception.message, exception.headers);
+  }
+  return c.html("Internal server error", 500, exception.headers);
 }
