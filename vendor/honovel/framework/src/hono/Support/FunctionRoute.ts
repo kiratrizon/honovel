@@ -10,7 +10,7 @@ import { myError } from "HonoHttp/builder.ts";
 import { SQLError } from "Illuminate/Database/Query/index.ts";
 import Model from "Illuminate/Database/Eloquent/Model.ts";
 import { ModelAttributes } from "../../../../@types/declaration/Base/IBaseModel.d.ts";
-import { ValidationException } from "Illuminate/Validation/ValidationException.ts";
+import ValidationException from "Illuminate/Validation/ValidationException.ts";
 import { TagContract } from "edge.js/types";
 import HonoView from "HonoHttp/HonoView.ts";
 import HonoRedirect from "HonoHttp/HonoRedirect.ts";
@@ -290,9 +290,8 @@ export function toMiddleware(
                   isFunction(middlewareInstance.handle)
                 ) {
                   middlewareCallback.push({
-                    debugString: `// class ${
-                      middlewareClass.name
-                    }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
+                    debugString: `// class ${middlewareClass.name
+                      }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
                     middleware: [
                       middlewareInstance.handle.bind(
                         middlewareInstance,
@@ -303,7 +302,7 @@ export function toMiddleware(
                     ],
                     from:
                       methodExist(middlewareInstance, "fallback") &&
-                      isFunction(middlewareInstance.fallback)
+                        isFunction(middlewareInstance.fallback)
                         ? "handle"
                         : undefined,
                   });
@@ -320,9 +319,8 @@ export function toMiddleware(
                     });
                   }
                   middlewareCallback.push({
-                    debugString: `// class ${
-                      middlewareClass.name
-                    }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
+                    debugString: `// class ${middlewareClass.name
+                      }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
                     middleware: [
                       middlewareInstance.fallback.bind(
                         middlewareInstance,
@@ -342,9 +340,8 @@ export function toMiddleware(
                 isFunction(middlewareInstance.handle)
               ) {
                 middlewareCallback.push({
-                  debugString: `// class ${
-                    middleware.name
-                  }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
+                  debugString: `// class ${middleware.name
+                    }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
                   middleware: [
                     middlewareInstance.handle.bind(
                       middlewareInstance,
@@ -353,7 +350,7 @@ export function toMiddleware(
                   ],
                   from:
                     methodExist(middlewareInstance, "fallback") &&
-                    isFunction(middlewareInstance.fallback)
+                      isFunction(middlewareInstance.fallback)
                       ? "handle"
                       : undefined,
                 });
@@ -370,9 +367,8 @@ export function toMiddleware(
                   });
                 }
                 middlewareCallback.push({
-                  debugString: `// class ${
-                    middleware.name
-                  }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
+                  debugString: `// class ${middleware.name
+                    }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
                   middleware: [
                     middlewareInstance.fallback.bind(
                       middlewareInstance,
@@ -396,9 +392,8 @@ export function toMiddleware(
             isFunction(middlewareInstance.handle)
           ) {
             middlewareCallback.push({
-              debugString: `// class ${
-                middlewareClass.name
-              }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
+              debugString: `// class ${middlewareClass.name
+                }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
               middleware: [
                 middlewareInstance.handle.bind(
                   middlewareInstance,
@@ -409,7 +404,7 @@ export function toMiddleware(
               ],
               from:
                 methodExist(middlewareInstance, "fallback") &&
-                isFunction(middlewareInstance.fallback)
+                  isFunction(middlewareInstance.fallback)
                   ? "handle"
                   : undefined,
             });
@@ -426,9 +421,8 @@ export function toMiddleware(
               });
             }
             middlewareCallback.push({
-              debugString: `// class ${
-                middlewareClass.name
-              }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
+              debugString: `// class ${middlewareClass.name
+                }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
               middleware: [
                 middlewareInstance.fallback.bind(
                   middlewareInstance,
@@ -453,9 +447,8 @@ export function toMiddleware(
           isFunction(middlewareInstance.handle)
         ) {
           middlewareCallback.push({
-            debugString: `// class ${
-              middlewareClass.name
-            }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
+            debugString: `// class ${middlewareClass.name
+              }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
             middleware: [
               middlewareInstance.handle.bind(
                 middlewareInstance,
@@ -464,7 +457,7 @@ export function toMiddleware(
             ],
             from:
               methodExist(middlewareInstance, "fallback") &&
-              isFunction(middlewareInstance.fallback)
+                isFunction(middlewareInstance.fallback)
                 ? "handle"
                 : undefined,
           });
@@ -481,9 +474,8 @@ export function toMiddleware(
             });
           }
           middlewareCallback.push({
-            debugString: `// class ${
-              middlewareClass.name
-            }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
+            debugString: `// class ${middlewareClass.name
+              }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
             middleware: [
               middlewareInstance.fallback.bind(
                 middlewareInstance,
@@ -506,9 +498,8 @@ export function toMiddleware(
           isFunction(middlewareInstance.handle)
         ) {
           middlewareCallback.push({
-            debugString: `// class ${
-              middlewareClass.name
-            }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
+            debugString: `// class ${middlewareClass.name
+              }@handle \n// Code Referrence \n\n${middlewareInstance.handle.toString()}`,
             middleware: [
               middlewareInstance.handle.bind(
                 middlewareInstance,
@@ -517,7 +508,7 @@ export function toMiddleware(
             ],
             from:
               methodExist(middlewareInstance, "fallback") &&
-              isFunction(middlewareInstance.fallback)
+                isFunction(middlewareInstance.fallback)
                 ? "handle"
                 : undefined,
           });
@@ -534,9 +525,8 @@ export function toMiddleware(
             });
           }
           middlewareCallback.push({
-            debugString: `// class ${
-              middlewareClass.name
-            }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
+            debugString: `// class ${middlewareClass.name
+              }@fallback \n// Code Referrence \n\n${middlewareInstance.fallback.toString()}`,
             middleware: [
               middlewareInstance.fallback.bind(
                 middlewareInstance,
@@ -889,15 +879,14 @@ export function renderErrorHtml(e: Error): string {
           ${e.message}
         </p>
 
-        ${
-          e.stack
-            ? `
+        ${e.stack
+      ? `
             <h2 class="text-xl font-semibold text-gray-800 mb-2">🧱 Stack Trace</h2>
             <pre class="text-xs leading-relaxed font-mono bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 overflow-x-auto whitespace-pre-wrap hover:scale-[1.01] transition-transform duration-200 ease-out shadow-inner">
 ${e.stack.replace(/</g, "&lt;")}
             </pre>`
-            : ""
-        }
+      : ""
+    }
       </div>
     </div>
   </body>
@@ -1137,8 +1126,8 @@ function renderDebugErrorPage(
 
       <div class="bg-gray-900 text-green-300 text-sm font-mono p-4 rounded-lg overflow-auto max-h-[400px] border border-gray-700">
         <pre class="whitespace-pre-wrap"><code>${formatDebugString(
-          escapeHtml(debugString),
-        )}</code></pre>
+    escapeHtml(debugString),
+  )}</code></pre>
       </div>
 
       <p class="text-xs text-gray-400 mt-6">
@@ -1225,27 +1214,23 @@ function tracingLocation(
     const isErrorLine = lineNumber === line;
 
     return `
-      <div id="${
-        isErrorLine ? "error-line" : ""
-      }" class="group flex items-start ${
-        isErrorLine ? "bg-rose-100" : "hover:bg-gray-100"
+      <div id="${isErrorLine ? "error-line" : ""
+      }" class="group flex items-start ${isErrorLine ? "bg-rose-100" : "hover:bg-gray-100"
       } rounded px-4 py-1">
         <div class="w-14 text-right pr-4 text-white-400 select-none">${lineNumber}</div>
-        <pre class="flex-1 text-sm overflow-auto whitespace-pre-wrap ${
-          isErrorLine
-            ? "text-rose-600"
-            : "group-hover:text-emerald-600 text-white-800"
-        }">${escapeHtml(contentLine)}</pre>
+        <pre class="flex-1 text-sm overflow-auto whitespace-pre-wrap ${isErrorLine
+        ? "text-rose-600"
+        : "group-hover:text-emerald-600 text-white-800"
+      }">${escapeHtml(contentLine)}</pre>
       </div>
-      ${
-        isErrorLine
-          ? `<div class="flex items-start">
+      ${isErrorLine
+        ? `<div class="flex items-start">
               <div class="w-14"></div>
               <pre class="text-sm text-rose-500 pl-4 leading-tight">${" ".repeat(
-                column - 1,
-              )}^</pre>
+          column - 1,
+        )}^</pre>
             </div>`
-          : ""
+        : ""
       }
     `;
   });
@@ -1273,8 +1258,8 @@ function tracingLocation(
         <div class="bg-white shadow-lg border border-gray-200 rounded-lg overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-100 bg-rose-50">
             <h1 class="text-xl font-semibold text-rose-600">${escapeHtml(
-              errorDescription,
-            )}</h1>
+    errorDescription,
+  )}</h1>
           </div>
 
           <div class="max-h-[500px] overflow-y-auto bg-gray-900 text-gray-100">
@@ -1323,30 +1308,7 @@ async function handleErrors(
     }
   } else if (e instanceof Exception) {
     // for http exceptions
-    const exception = application.getException(e);
-    const myHono = c.get("myHono");
-    if (exception && myHono) {
-      const firstResp = await exception.cb(myHono);
-      if (firstResp instanceof RedirectResponse) {
-        saveSessionIfRedirect(request);
-      }
-      // @ts-ignore //
-      const cookies = firstResp.getCookies();
-      for (const [name, [value, options]] of Object.entries(cookies)) {
-        myHono.Cookie.queue(name, value, options);
-      }
-      // @ts-ignore //
-      const res = firstResp.toResponse();
-
-      resp = convertToResponse(c, res);
-    } else {
-      const code = e.httpCode;
-      if (request.expectsJson()) {
-        resp = c.json({ message: e.message }, code);
-      } else {
-        resp = c.html(renderErrorHtml(e), code);
-      }
-    }
+    resp = await exceptionToResponse(c, e);
   } else if (e instanceof SQLError) {
     if (request.expectsJson()) {
       resp = c.json(
@@ -1359,9 +1321,6 @@ async function handleErrors(
     } else {
       resp = c.html(renderErrorHtml(e), 500);
     }
-  } else if (e instanceof ValidationException) {
-    const action = e.response;
-    resp = await handleAction(action, c);
   } else if (e instanceof Error) {
     // populate e with additional information
     const populatedError: Record<string, unknown> = {};
@@ -1446,13 +1405,11 @@ export async function handleAction(
           return oldInput[key] ?? defaultValue;
         },
         csrf: () => {
-          return `<input type="hidden" name="_token" value="${
-            request.session.get("_token") || ""
-          }">`;
+          return `<input type="hidden" name="_token" value="${request.session.get("_token") || ""
+            }">`;
         },
         csrfMeta: () =>
-          `<meta name="csrf-token" content="${
-            request.session.get("_token") || ""
+          `<meta name="csrf-token" content="${request.session.get("_token") || ""
           }">`,
         errors: new MessageBag((errors || {}) as ErrorsShape),
         console: console,
@@ -1466,8 +1423,7 @@ export async function handleAction(
           seekable: true,
           compile: (parser, buffer, token) => {
             buffer.outputRaw(
-              `<input type="hidden" name="_token" value="${
-                request.session.get("_token") || ""
+              `<input type="hidden" name="_token" value="${request.session.get("_token") || ""
               }">`,
             );
           },
@@ -1663,26 +1619,28 @@ export async function exceptionToResponse(c: MyContext, exception: Exception): P
   const myHono = c.get("myHono");
   const getException = application.getException(exception);
   if (getException && myHono) {
-    const firstResp = await getException.cb(myHono);
+    const firstResp = await getException.cb(myHono, exception);
     if (firstResp instanceof RedirectResponse) {
       saveSessionIfRedirect(myHono.request);
     }
-    // @ts-ignore //
-    const cookies = firstResp.getCookies();
-    for (const [name, [value, options]] of Object.entries(cookies)) {
-      myHono.Cookie.queue(name, value, options);
+    if (firstResp instanceof HonoView) {
+      const rendered = await firstResp.element();
+      return c.html(rendered, 200);
     }
-    // @ts-ignore //
-    const res = firstResp.toResponse();
-    return convertToResponse(c, res);
+    if (firstResp instanceof HonoResponse) {
+      // @ts-ignore //
+      const cookies = firstResp.getCookies();
+      for (const [name, [value, options]] of Object.entries(cookies)) {
+        myHono.Cookie.queue(name, value, options);
+      }
+      // @ts-ignore //
+      const res = firstResp.toResponse();
+      return convertToResponse(c, res);
+    }
+    if (isset(firstResp)) {
+      // stringify the response
+      return c.text(isString(firstResp) ? firstResp : jsonEncode(firstResp), exception.httpCode, exception.headers);
+    }
   }
-  return await exceptionNotExistToResponse(c, exception);
-}
-
-async function exceptionNotExistToResponse(c: MyContext, exception: Exception): Promise<Response> {
-  const myHono = c.get("myHono");
-  if (myHono) {
-    return await myError(c, exception.httpCode, exception.message, exception.headers);
-  }
-  return c.html("Internal server error", 500, exception.headers);
+  return await myError(c, exception.httpCode, exception.message, exception.headers);
 }

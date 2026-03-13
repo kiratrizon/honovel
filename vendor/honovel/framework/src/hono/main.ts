@@ -22,6 +22,7 @@ import {
   toNotfound,
   saveSessionIfRedirect,
   convertToResponse,
+  exceptionToResponse,
 } from "./Support/FunctionRoute.ts";
 import { IMyConfig } from "./Support/MethodRoute.ts";
 import { honoSession } from "HonoHttp/HonoSession.ts";
@@ -710,25 +711,7 @@ class Server {
   private static endInit() {
     this.app.notFound(async function (c: MyContext) {
       const notFoundInstance = new NotFoundHttpException();
-      // find if the exception exist in the application
-      const exception = application?.getException(notFoundInstance);
-      const myHono = c.get("myHono");
-      if (exception && myHono) {
-        const firstResp = await exception.cb(myHono);
-        if (firstResp instanceof RedirectResponse) {
-          saveSessionIfRedirect(myHono.request);
-        }
-        // @ts-ignore //
-        const cookies = firstResp.getCookies();
-        for (const [name, [value, options]] of Object.entries(cookies)) {
-          myHono.Cookie.queue(name, value, options);
-        }
-        // @ts-ignore //
-        const res = firstResp.toResponse();
-  
-        return convertToResponse(c, res);
-      }
-      return await myError(c);
+      return await exceptionToResponse(c, notFoundInstance);
     });
 
     const ServerDomainKeys = Object.keys(this.domainPattern); // ["web", "api"]

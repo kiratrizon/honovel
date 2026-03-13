@@ -12,7 +12,7 @@ export interface RoutingConfig {
   commands?: RouterLoader;
   health?: string;
 }
-
+export type ExceptionConstructor = new (...args: any[]) => Exception;
 export default class Application {
   private static middleware: typeof Middleware = Middleware;
 
@@ -31,7 +31,7 @@ export default class Application {
     return this;
   }
 
-  static create(){
+  static create() {
     return new this();
   }
 
@@ -48,8 +48,8 @@ export default class Application {
     return data;
   }
 
-  private static exceptions: Record<string, { exception: typeof HttpException | typeof Exception, cb: IExceptionCallback }> = {};
-  public addException(exception: typeof HttpException | typeof Exception, cb: IExceptionCallback) {
+  private static exceptions: Record<string, { exception: ExceptionConstructor, cb: IExceptionCallback }> = {};
+  protected static addException(exception: ExceptionConstructor, cb: IExceptionCallback) {
     if (!Application.exceptions[exception.name]) {
       Application.exceptions[exception.name] = {
         exception,

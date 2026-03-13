@@ -5,7 +5,7 @@ import { DDError } from "../Maneuver/HonovelErrors.ts";
 import HonoRedirect from "HonoHttp/HonoRedirect.ts";
 import HonoResponseV2 from "HonoHttp/HonoResponse.ts";
 import Event from "Illuminate/Events/index.ts";
-import HttpException from "Illuminate/Foundation/HttpExecptions/HttpException.ts";
+import Exceptions from "Illuminate/Foundation/Execptions/Exceptions.ts";
 
 globalFn("response", function (html = null, status = 200) {
   if (!isset(html)) {
@@ -28,9 +28,9 @@ globalFn("dd", (...args: unknown[]) => {
 });
 
 globalFn("abort", (statusCode = 500, message = null) => {
-  const exception =  new HttpException(statusCode);
+  const exception = Exceptions.find(statusCode);
   if (isset(message)) {
-    exception.setMessage(message);
+    exception.message = message;
   }
   throw exception;
 });
