@@ -11,6 +11,6 @@ export default class ValidationException extends Exception {
     this.name = "ValidationException";
   }
 
-  public errors?: Record<string, string[]>;
-  public input?: Record<string, any>;
+  public errors: Record<string, string[]> = {};
+  public input: Record<string, any> = {};
 }
