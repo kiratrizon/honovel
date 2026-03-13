@@ -24,6 +24,7 @@ import HonoRequest from "HonoHttp/HonoRequest.ts";
 import { MiddlewareLikeClass } from "Illuminate/Foundation/Configuration/Middleware.ts";
 import HttpException from "Illuminate/Foundation/HttpExecptions/HttpException.ts";
 import Exception from "Illuminate/Foundation/Execptions/Exception.ts";
+import Application from "Illuminate/Foundation/Application.ts";
 
 export const regexObj = {
   number: /^\d+$/,
@@ -1617,7 +1618,8 @@ export function convertToResponse(c: MyContext, res: Response): Response {
 
 export async function exceptionToResponse(c: MyContext, exception: Exception): Promise<Response> {
   const myHono = c.get("myHono");
-  const getException = application.getException(exception);
+  // @ts-ignore //
+  const getException = Application.getException(exception);
   if (getException && myHono) {
     const firstResp = await getException.cb(myHono, exception);
     if (firstResp instanceof RedirectResponse) {
