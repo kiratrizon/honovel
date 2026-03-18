@@ -515,12 +515,6 @@ export default class Model<
     return instance;
   }
 
-  /**
-   * Create many model instances.
-   * @param attributes The attributes to create many models.
-   * @returns The created model instances.
-   */
-
   public static async createMany<Attr extends Record<string, unknown>>(
     attributes: Attr[],
   ) {
