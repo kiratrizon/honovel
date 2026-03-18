@@ -516,6 +516,22 @@ export default class Model<
   }
 
   /**
+   * Create many model instances.
+   * @param attributes The attributes to create many models.
+   * @returns The created model instances.
+   */
+
+  public static async createMany<Attr extends Record<string, unknown>>(
+    attributes: Attr[],
+  ) {
+    const instances = attributes.map((attribute) => {
+      return new this(attribute) as Model<ModelAttributes>;
+    });
+    await Promise.all(instances.map((instance) => instance.save()));
+    return instances;
+  }
+
+  /**
    * Create a new model instance.
    * @param connection The database connection name.
    * @returns The created model instance.
@@ -826,6 +842,17 @@ export default class Model<
       model: this,
       fields: ["*"],
     }).get<T>();
+  }
+
+  /**
+   * Get the count of records from the database.
+   * @returns The count of records.
+   */
+  public static async count(): Promise<number> {
+    return await new Builder({
+      model: this,
+      fields: ["*"],
+    }).count();
   }
 
   /**
