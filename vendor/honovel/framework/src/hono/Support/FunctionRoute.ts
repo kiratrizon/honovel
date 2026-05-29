@@ -1380,6 +1380,10 @@ export async function handleAction(
           return request.session;
         },
         env: env,
+        route: function (name: string, params: Record<string, unknown> = {}) {
+          console.log(request.getHost());
+          return request.getHost() + route(name, params);
+        },
         request: function () {
           return request;
         },
@@ -1398,15 +1402,15 @@ export async function handleAction(
             )
             .join("");
         },
-        old: function (key: string, defaultValue: unknown = null) {
+        old: function (key: string, defaultValue: unknown = '') {
           const oldInput = (request.session.get("_old_input") || {}) as Record<
             string,
             unknown
           >;
           return oldInput[key] ?? defaultValue;
         },
-        csrf: () => {
-          return `<input type="hidden" name="_token" value="${request.session.get("_token") || ""
+        csrf: (id: string = "_token") => {
+          return `<input type="hidden" id="${id}" name="${id}" value="${request.session.get("_token") || ""
             }">`;
         },
         csrfMeta: () =>
@@ -1481,22 +1485,44 @@ export async function handleAction(
                 viteServer
               ) {
                 const port = viteConfig?.server?.port || 5173;
+                // instance a file cache to store the file names
+                const filesToSave: string[] = [];
                 args.forEach((file) => {
                   // remove leading slash for file
                   file = file.replace(/^\//, "");
+                  if (!filesToSave.includes(file)) {
+                    filesToSave.push(file);
+                  }
                   if (
                     file.toLowerCase().endsWith(".js") ||
                     file.toLowerCase().endsWith(".ts")
                   ) {
                     buffer.outputRaw(
-                      `<script type="module" src="http://localhost:${port}/${file}"></script>`,
+                      `<script type="module" src="http://127.0.0.1:${port}/${file}"></script>`,
                     );
                   } else if (file.toLowerCase().endsWith(".css")) {
                     buffer.outputRaw(
-                      `<link rel="stylesheet" href="http://localhost:${port}/${file}">`,
+                      `<link rel="stylesheet" href="http://127.0.0.1:${port}/${file}">`,
                     );
                   }
                 });
+                // get file contents from the json file
+                const fileContents = getFileContents(basePath("storage/framework/cache/vite.json"));
+                try {
+                  const fileContentsJson = jsonDecode(fileContents);
+                  // check if it's included in the filesToSave
+                  const files = fileContentsJson.files as string[];
+                  // concatenate but never duplicate
+                  const concatenatedFiles = [...files, ...filesToSave];
+                  // remove duplicates
+                  const uniqueFiles = concatenatedFiles.filter((file, index, self) => self.indexOf(file) === index);
+                  // save to the json file
+                  writeFile(basePath("storage/framework/cache/vite.json"), jsonEncode({
+                    files: uniqueFiles,
+                  }));
+                } catch {
+                  // handle error
+                }
               } else {
                 // find the manifest.json under use deno readfile
 
@@ -1556,7 +1582,7 @@ export async function handleAction(
       });
       return c.html(rendered, 200);
     } else if (data instanceof HonoRedirect) {
-      saveSessionIfRedirect(request);
+      saveSessionIfRedirect(request, data);
       switch (data.type) {
         case "back":
           // @ts-ignore //
@@ -1569,9 +1595,6 @@ export async function handleAction(
           throw new Error("Invalid use of redirect()");
       }
     } else if (data instanceof HonoResponse) {
-      if (data instanceof RedirectResponse) {
-        saveSessionIfRedirect(request);
-      }
       // @ts-ignore //
       const cookies = data.getCookies();
       for (const [name, [value, options]] of Object.entries(cookies)) {
@@ -1593,7 +1616,21 @@ export async function handleAction(
   }
 }
 
-export function saveSessionIfRedirect(request: HRequest) {
+export function saveSessionIfRedirect(request: HRequest, data: HonoRedirect) {
+  const withInputValue = data.withInputValue;
+  if (!isObject(withInputValue) && withInputValue === true) {
+    request.flash();
+  } else if (isObject(withInputValue)) {
+    request.session.flash("_old_input", withInputValue);
+  }
+  if (isset(data.flashData)) {
+    Object.entries(data.flashData).forEach(([key, value]) => {
+      request.session.flash(key, value);
+    });
+  }
+  if (isset(data.errorData)) {
+    request.session.flash("errors", data.errorData)
+  }
   const sessionFlashData = request.session.get(
     "_flash",
   ) as SessionDataTypes["_flash"];
@@ -1622,13 +1659,6 @@ export async function exceptionToResponse(c: MyContext, exception: Exception): P
   const getException = Application.getException(exception);
   if (getException && myHono) {
     const firstResp = await getException.cb(myHono, exception);
-    if (firstResp instanceof RedirectResponse) {
-      saveSessionIfRedirect(myHono.request);
-    }
-    if (firstResp instanceof HonoView) {
-      const rendered = await firstResp.element();
-      return c.html(rendered, 200);
-    }
     if (firstResp instanceof HonoResponse) {
       // @ts-ignore //
       const cookies = firstResp.getCookies();
@@ -1637,7 +1667,26 @@ export async function exceptionToResponse(c: MyContext, exception: Exception): P
       }
       // @ts-ignore //
       const res = firstResp.toResponse();
+
       return convertToResponse(c, res);
+    }
+    if (firstResp instanceof HonoView) {
+      const rendered = await firstResp.element();
+      return c.html(rendered, 200);
+    }
+    if (firstResp instanceof HonoRedirect) {
+      saveSessionIfRedirect(myHono.request, firstResp);
+      switch (firstResp.type) {
+        case "back":
+          // @ts-ignore //
+          return c.redirect(myHono.request.session.get("_previous.url") || "/", 302);
+        case "redirect":
+        case "to":
+        case "route":
+          return c.redirect(firstResp.getTargetUrl(), 302);
+        default:
+          throw new Error("Invalid use of redirect()");
+      }
     }
     if (isset(firstResp)) {
       // stringify the response

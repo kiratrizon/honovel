@@ -10,12 +10,13 @@ import Builder from "./Builder.ts";
 import { Factory, HasFactory } from "./Factories/index.ts";
 import Collection from "./Collection.ts";
 import {
+  SQLRaw,
   WhereInterpolator,
   WhereOperator,
   WherePrimitive,
 } from "../Query/index.ts";
 
-export default abstract class Model<
+export default class Model<
   T extends ModelAttributes = ModelAttributes,
 > {
   constructor(attributes: Partial<T> = {}) {
@@ -296,7 +297,7 @@ export default abstract class Model<
    * @param attributes The attributes to fill.
    * @returns The model instance.
    */
-  public forceFill(attributes: T): this {
+  public forceFill(attributes: Record<string, unknown>): this {
     for (const [key, value] of Object.entries(attributes)) {
       // @ts-ignore //
       this.setAttribute(key, value);
@@ -515,6 +516,16 @@ export default abstract class Model<
     return instance;
   }
 
+  public static async createMany<Attr extends Record<string, unknown>>(
+    attributes: Attr[],
+  ) {
+    const instances = attributes.map((attribute) => {
+      return new this(attribute) as Model<ModelAttributes>;
+    });
+    await Promise.all(instances.map((instance) => instance.save()));
+    return instances;
+  }
+
   /**
    * Create a new model instance.
    * @param connection The database connection name.
@@ -523,7 +534,7 @@ export default abstract class Model<
   // Never use this in production code, it's for development CLI only.
   public static async factory(connection?: string): Promise<Factory> {
     if (!isset(this.use)) {
-      throw new Error("This model does not support factories.");
+      throw new Error(this.name + " does not support factories.");
     }
     if (!isset(this.use["HasFactory"])) {
       throw new Error("This model does not support factories.");
@@ -542,6 +553,7 @@ export default abstract class Model<
     if (!methodExist(factoryClass, "getFactoryByModel")) {
       throw new Error(`${this.name} does not have a factory method.`);
     }
+    // @ts-ignore //
     const factory = await factoryClass.getFactoryByModel(this);
     // @ts-ignore //
     factory.setConnection(connection);
@@ -612,6 +624,20 @@ export default abstract class Model<
       fields: ["*"],
       // @ts-ignore //
     }).where(...args);
+  }
+
+  public static whereRaw(raw: SQLRaw, bindings: unknown[] = []): Builder {
+    return new Builder({
+      model: this,
+      fields: ["*"],
+    }).whereRaw(raw, bindings);
+  }
+
+  public static async paginate(page: number, perPage: number = 10, urlPath?: URL): Promise<Paginator<Record<string, unknown>>> {
+    return await new Builder({
+      model: this,
+      fields: ["*"],
+    }).paginate(page, perPage, urlPath);
   }
 
   /**
@@ -818,13 +844,22 @@ export default abstract class Model<
    * Get all records from the database.
    * @returns An array of model instances.
    */
-  public static async all<T extends typeof Model = typeof Model>(): Promise<
-    InstanceType<T>[]
-  > {
+  public static async all<T extends typeof Model = typeof Model>(): Promise<Collection<InstanceType<T>>> {
     return await new Builder({
       model: this,
       fields: ["*"],
     }).get<T>();
+  }
+
+  /**
+   * Get the count of records from the database.
+   * @returns The count of records.
+   */
+  public static async count(): Promise<number> {
+    return await new Builder({
+      model: this,
+      fields: ["*"],
+    }).count();
   }
 
   /**
@@ -920,6 +955,7 @@ export default abstract class Model<
         newRecord.lastInsertRowId as T[typeof primaryKey],
       );
     }
+    return this;
   }
 
   /**
@@ -991,6 +1027,9 @@ export default abstract class Model<
   }
 }
 
+export type ModelConstructor = new (...args: unknown[]) => Model;
+
 // Import AfterOn and WithBuilder to avoid circular dependency issues
 import AfterOn from "./AfterOn.ts";
 import WithBuilder from "./WithBuilder.ts";
+import Paginator from "../../Pagination/Paginator.ts";

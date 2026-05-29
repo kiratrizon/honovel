@@ -129,7 +129,7 @@ import { ISession } from "../../../../@types/declaration/ISession.d.ts";
 import { CookieOptions } from "hono/utils/cookie";
 import { Authenticatable } from "Illuminate/Contracts/Auth/index.ts";
 import IHonoHeader from "../../../../@types/declaration/IHonoHeader.d.ts";
-import Model from "Illuminate/Database/Eloquent/Model.ts";
+import Model, { ModelConstructor } from "Illuminate/Database/Eloquent/Model.ts";
 import { ModelAttributes } from "../../../../@types/declaration/Base/IBaseModel.d.ts";
 import HonoFile from "./HonoFile.ts";
 
@@ -317,10 +317,20 @@ declare class HonoRequest {
   /** Validate request data with rules */
   validate<T extends Record<string, string>>(
     validations: T,
+
+    /**
+     * Custom messages for validator errors.
+     * Example:
+     * {
+     *   "email.required": "The email field is required.",
+     *   "email.email": "The email field must be a valid email address.",
+     * }
+     */
+    messages?: Record<string, string>,
   ): Promise<Record<keyof T | string, string>>;
 
   /** Bind route parameters to request */
-  public bindRoute(params: Record<string, typeof Model<ModelAttributes>>): void;
+  public bindRoute(params: Record<string, ModelConstructor>): void;
 
   /**
    * Set a variable along the request lifecycle

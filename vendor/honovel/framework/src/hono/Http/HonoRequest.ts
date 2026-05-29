@@ -179,7 +179,11 @@ class HonoRequest extends Macroable {
   public clean(data: Record<string, unknown>) {
     const cleaned: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
-      cleaned[key] = value === "" ? null : value;
+      if (value === "" || value === "null") {
+        cleaned[key] = null;
+      } else {
+        cleaned[key] = value;
+      }
     }
     return cleaned;
   }
@@ -567,12 +571,14 @@ class HonoRequest extends Macroable {
 
   public async validate<T extends Record<string, string>>(
     validations: T,
+    messages?: Record<string, string>,
   ): Promise<Record<keyof T, string>>;
   public async validate<T extends Record<string, string>>(
     validations: T,
+    messages?: Record<string, string>,
   ): Promise<Record<keyof T | string, string>> {
     const data = this.method == "GET" ? this.query() : this.input();
-    const validation = await Validator.make(data, validations);
+    const validation = await Validator.make(data, validations, messages);
 
     if (validation.fails()) {
       const errors = validation.getErrors();

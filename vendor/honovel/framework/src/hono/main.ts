@@ -76,24 +76,42 @@ function serveDiskStatic(urlPrefix: string, diskRoot: string) {
 import inlineConfig from "../../../../vite/vite-manipulate.ts";
 const vitePort = inlineConfig?.server?.port || 5173;
 
-// Check if a Vite server is actually responding
+/** Max wait when the dev server is down (Windows TCP + fetch can hang for many seconds). */
+const VITE_PROBE_MS = 250;
+
+// Check if something is listening on the Vite port (TCP probe — faster than HTTP; capped timeout)
 const isViteRunning = async (port: number): Promise<boolean> => {
   try {
-    const resp = await fetch(`http://127.0.0.1:${port}`, { method: "GET" });
-    return resp.status < 500; // true if server responds
-  } catch (_e) {
-    return false; // connection refused or server not up
+    const conn = await Deno.connect({
+      hostname: "127.0.0.1",
+      port,
+      signal: AbortSignal.timeout(VITE_PROBE_MS),
+    });
+    conn.close();
+    return true;
+  } catch {
+    return false;
   }
 };
 
 if (config("app").env === "local") {
-  const viteServer = await isViteRunning(vitePort);
-  define("viteServer", viteServer, false);
-
-  if (viteServer) {
-    console.info("✅ Vite server is running");
+  let viteServer: boolean = false;
+  // vite local versioning
+  // this will be the last version of the framework that will support vite local development for deno 2.7.5 and below
+  if (versionCompare(frameworkVersion().honovelVersion, "2.0.1", ">") && (versionCompare(frameworkVersion().denoVersion, "2.7.5", ">") && versionCompare(frameworkVersion().denoVersion, "2.7.11", "<"))) {
+    console.warn("⚡ Vite server is not supported for this version of the framework", frameworkVersion());
   } else {
-    // console.info("⚡ Vite server is not running");
+    viteServer = await isViteRunning(vitePort);
+    define("viteServer", viteServer, false);
+    if (viteServer) {
+      // check a json file if exist
+      if (!(await pathExist(basePath("storage/framework/cache/vite.json")))) {
+        makeDir(path.dirname(basePath("storage/framework/cache/vite.json")));
+        writeFile(basePath("storage/framework/cache/vite.json"), jsonEncode({
+          files: [],
+        }));
+      }
+    }
   }
 }
 
@@ -129,8 +147,8 @@ const myStaticDefaults: MiddlewareHandler[] = [
   }),
 ];
 
-const globalMiddleware:MiddlewareHandler[] = [];
-const globalMiddlewareFallback:TFallbackMiddleware[] = [];
+const globalMiddleware: MiddlewareHandler[] = [];
+const globalMiddlewareFallback: TFallbackMiddleware[] = [];
 
 // domain on beta test
 const _forDomain: MiddlewareHandler = async (
@@ -215,6 +233,10 @@ class Server {
     const conditionalLogger = async (c: any, next: () => Promise<void>) => {
       const url = c.req.url;
       // skip if path ends with __warmup
+      const skipPaths = ['/.well-known', '/robots.txt', '/favicon.ico'];
+      if (skipPaths.some(path => new URL(url).pathname.startsWith(path))) {
+        return await next(); // skip logging
+      }
       if (!url.endsWith("__warmup")) {
         await logger()(c, next); // call logger middleware
       } else {
@@ -296,7 +318,7 @@ class Server {
 
     // initialize the app
     await this.loadAndValidateRoutes();
-    this.endInit();
+    await this.endInit();
   }
 
   private static async generateNewApp(
@@ -340,7 +362,7 @@ class Server {
       MiddlewareHandler[],
       TFallbackMiddleware[],
     ] = [...toMiddleware(mainMiddleware)];
-    
+
     // @ts-ignore //
     app.use(
       "*",
@@ -371,7 +393,7 @@ class Server {
       ),
       ...(routers.web !== undefined && { web: routers.web })
     };
-    
+
     for (const [key, val] of Object.entries(ordered)) {
       try {
         await val();
@@ -432,6 +454,7 @@ class Server {
                     fixUri,
                     arrangerDispatch.requiredParams,
                     arrangerDispatch.optionalParams,
+                    methodarr
                   );
                 }
               }
@@ -563,6 +586,22 @@ class Server {
                 MiddlewareHandler[],
                 TFallbackMiddleware[],
               ] = toMiddleware(middleware);
+
+              const hasOnlySlash: {
+                found: boolean;
+                method: string[];
+                allBuilds: MiddlewareHandler[];
+              } = {
+                found: false,
+                method: [],
+                allBuilds: [],
+              };
+              const generatedopts = URLArranger.generateOptionalParamRoutes(
+                arrangerGroup.string,
+                "group",
+                where,
+              );
+
               groupEntries.forEach(([routeId, methodarr]) => {
                 const routeUsed = methods[routeId];
                 const myConfig = routeUsed.config;
@@ -592,7 +631,7 @@ class Server {
                 ];
 
                 const flagWhere = flag.where || {};
-                const splittedUri = URLArranger.generateOptionalParamRoutes(
+                let splittedUri = URLArranger.generateOptionalParamRoutes(
                   newMethodUri,
                   "dispatch",
                   flagWhere,
@@ -612,6 +651,7 @@ class Server {
                       finalUrl,
                       arrangerDispatch.requiredParams,
                       arrangerDispatch.optionalParams,
+                      methodarr
                     );
                   }
                 }
@@ -639,6 +679,18 @@ class Server {
                   returnResponse,
                 ];
 
+                // make sure splittedUri is not only "/" else splice
+                splittedUri = splittedUri.filter((str) => {
+                  if (str === "/" && !generatedopts.includes("/")) {
+                    hasOnlySlash.found = true;
+                  }
+                  return true;    // keep this element
+                });
+
+                if (hasOnlySlash.found) {
+                  hasOnlySlash.method = methodarr;
+                  hasOnlySlash.allBuilds = [...allBuilds];
+                }
                 if (
                   methodarr.length === 1 &&
                   arrayFirst(methodarr) === "head"
@@ -658,11 +710,19 @@ class Server {
                 }
               });
               const newAppGroup = await this.generateNewApp();
-              const generatedopts = URLArranger.generateOptionalParamRoutes(
-                arrangerGroup.string,
-                "group",
-                where,
-              );
+
+              if (hasOnlySlash.found) {
+                generatedopts.forEach((grp) => {
+                  if (hasOnlySlash.method.length === 1 && hasOnlySlash.method[0] === "head") {
+                    hasOnlySlash.allBuilds.splice(1, 0, headFunction);
+                    // @ts-ignore //
+                    newAppGroup.get(grp == "/" ? grp : `${grp}/`, ...hasOnlySlash.allBuilds);
+                  } else {
+                    // @ts-ignore //
+                    newAppGroup.on(hasOnlySlash.method, grp == "/" ? grp : `${grp}/`, ...hasOnlySlash.allBuilds);
+                  }
+                });
+              }
               generatedopts.forEach((grp) => {
                 // apply the middlewares here
                 // @ts-ignore //
@@ -708,7 +768,7 @@ class Server {
     }
   }
 
-  private static endInit() {
+  private static async endInit() {
     this.app.notFound(async function (c: MyContext) {
       const notFoundInstance = new NotFoundHttpException();
       return await exceptionToResponse(c, notFoundInstance);
@@ -725,6 +785,17 @@ class Server {
         });
       });
     });
+
+    // save routes in a file cache
+    if (!isset(env("DENO_DEPLOYMENT_ID")) || empty(env("DENO_DEPLOYMENT_ID"))) {
+      if (!(await pathExist(storagePath("framework/route")))) {
+        makeDir(storagePath("framework/route"));
+      }
+
+      // arrange json file with pretty format
+      const prettyRoutes = JSON.stringify(this.routes, null, 2);
+      writeFile(path.join(storagePath("framework/route"), "routes.json"), prettyRoutes);
+    }
   }
 }
 
@@ -769,7 +840,19 @@ globalFn(
       }
     });
 
-    return finalUrl;
+    // $_GET build
+    const allParams = [...requiredParams, ...optionalParams];
+    let buildUrl = config("app.url") + finalUrl;
+    const $_GET: string[] = [];
+    Object.entries(params).forEach(([key, value]) => {
+      if (!allParams.includes(key) && isset(value)) {
+        $_GET.push(`${key}=${encodeURIComponent(value)}`);
+      }
+    });
+    if ($_GET.length > 0) {
+      buildUrl += `?${$_GET.join("&")}`;
+    }
+    return buildUrl;
   },
 );
 

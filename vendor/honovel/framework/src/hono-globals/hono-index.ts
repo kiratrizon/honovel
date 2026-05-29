@@ -27,11 +27,8 @@ globalFn("dd", (...args: unknown[]) => {
   throw new DDError(returnValue ?? null);
 });
 
-globalFn("abort", (statusCode = 500, message = null) => {
-  const exception = Exceptions.find(statusCode);
-  if (isset(message)) {
-    exception.message = message;
-  }
+globalFn("abort", (statusCode = 500, message = null, headers: Record<string, string> = {}) => {
+  const exception = Exceptions.find(statusCode, message, headers);
   throw exception;
 });
 
@@ -39,6 +36,6 @@ globalFn("redirect", (url = null) => {
   return new HonoRedirect(url);
 });
 
-globalFn("event", async (event: string | object, payload: any[] = []) => {
+globalFn("myEvent", async (event: string | object, payload: any[] = []) => {
   return await Event.dispatch(event, payload);
 });

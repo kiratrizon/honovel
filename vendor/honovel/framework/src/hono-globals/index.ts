@@ -11,7 +11,7 @@ try {
       Deno.env.set(key, value);
     }
   }
-} catch (_) {}
+} catch (_) { }
 
 if (Deno.env.get("VERCEL") == "1") {
   Deno.env.set("DENO_DEPLOYMENT_ID", Deno.env.get("VERCEL_URL") || "");
@@ -338,7 +338,7 @@ globalFn(
     defaultValue: unknown = null,
   ) {
     if (isString(key)) {
-      return configure.read(key) || defaultValue;
+      return configure?.read(key, defaultValue) ?? defaultValue;
     }
     throw new Error("Invalid key");
   },
@@ -591,9 +591,14 @@ globalFn("time", () => {
   return strToTime("now");
 });
 
-globalFn("jsonEncode", function (data) {
+globalFn("jsonEncode", function (data, pretty = false) {
   try {
-    return JSON.stringify(data);
+    if (pretty) {
+      return JSON.stringify(data, null, 2);
+    }
+    return JSON.stringify(data, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value,
+    );
   } catch (_error) {
     return "";
   }
@@ -688,7 +693,6 @@ globalFn(
 
 import { Carbon } from "helpers";
 import { DB } from "Illuminate/Support/Facades/index.ts";
-import { error } from "node:console";
 
 globalFn("arrayFirst", function (array: unknown[]) {
   return isArray(array) && array.length > 0 ? array[0] : null;
@@ -737,7 +741,7 @@ globalFn(
     value: any,
     destination: string = "debug",
     identifier: string = "",
-  ) {},
+  ) { },
 );
 
 // import process from "node:process";
@@ -747,5 +751,9 @@ globalFn(
 //   console.warn(warning.message);
 //   console.warn(warning.stack);
 // });
+
+globalFn("isURL", function (url: string) {
+  return /^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$/.test(url);
+});
 
 DB.init();

@@ -1,5 +1,6 @@
 import { Database } from "Database";
 import { DB } from "../../Support/Facades/index.ts";
+import Paginator from "../../Pagination/Paginator.ts";
 
 export class SQLError extends Error {
   constructor(message: string) {
@@ -70,6 +71,15 @@ export class WhereInterpolator {
     ]
   ): this {
     this.whereProcess("AND", ...args);
+    return this;
+  }
+
+  // whereRaw
+  public whereRaw(raw: SQLRaw, bindings: WhereValue[] = []): this {
+    if (!(raw instanceof SQLRaw)) {
+      throw new SQLError("Invalid where raw clause");
+    }
+    this.whereClauses.push([raw.toString(), bindings]);
     return this;
   }
 
@@ -864,7 +874,11 @@ export class Builder extends WhereInterpolator {
     return this;
   }
 
-  public limit(value: number): this {
+  public limit(value: number | null): this {
+    if (value === null) {
+      this.limitValue = null;
+      return this;
+    }
     if (!isInteger(value) || value < 0) {
       throw new SQLError("Limit must be a non-negative number");
     }
@@ -872,7 +886,11 @@ export class Builder extends WhereInterpolator {
     return this;
   }
 
-  public offset(value: number): this {
+  public offset(value: number | null): this {
+    if (value === null) {
+      this.offsetValue = null;
+      return this;
+    }
     if (!isInteger(value) || value < 0) {
       throw new SQLError("Offset must be a non-negative number");
     }
@@ -972,28 +990,23 @@ export class Builder extends WhereInterpolator {
     }
   }
 
-  #built: boolean = false;
-  private toSqlWithValues(type: string = "select") {
-    if (this.#built) {
-      return;
-    }
-    const field = this.fields;
-    const joins = this.joinClauses;
-    const where = this.whereClauses;
-    const groupBy = this.groupByValue;
-    const having = this.havingClauses;
-    const orderBy = this.orderByValue;
-    const offset = this.offsetValue;
-    const limit = this.limitValue;
+  /**
+   * Single compile pass: fills `#sql` and `#params` together so they always match.
+   * `toSql()` and `getBindings()` both delegate here (call twice if you need both and
+   * want to avoid two passes — use `getCompiledQuery()` instead).
+   */
+  #compileQuery(kind: "select" | "delete" = "select") {
+    this.#params = [];
+    const field = [...this.fields];
+    const joins = [...this.joinClauses];
+    const where = [...this.whereClauses];
+    const groupBy = [...this.groupByValue];
+    const having = [...this.havingClauses];
+    const orderBy = [...this.orderByValue];
+    const offset = this.offsetValue ?? null;
+    const limit = this.limitValue ?? null;
 
-    let sql;
-    if (type === "insert") {
-      sql = "INSERT INTO";
-    } else if (type === "delete") {
-      sql = "DELETE";
-    } else {
-      sql = "SELECT";
-    }
+    let sql = kind === "delete" ? "DELETE" : "SELECT";
     const fieldStr: string[] = [];
     field.forEach(([str, bool]) => {
       if (bool) {
@@ -1001,7 +1014,7 @@ export class Builder extends WhereInterpolator {
       }
       fieldStr.push(str);
     });
-    if (type === "select") {
+    if (kind === "select") {
       sql += ` ${fieldStr.join(", ")}`;
     }
     sql += ` ${this.buildFromClause()}`;
@@ -1055,65 +1068,96 @@ export class Builder extends WhereInterpolator {
           })
           .join(", ");
     }
-    if (offset !== null) {
-      sql += ` OFFSET ?`;
-      this.#params.push(offset);
-    }
-    if (limit !== null) {
-      sql += ` LIMIT ?`;
-      this.#params.push(limit);
+
+    const driver = this.database.getDriver();
+    const wantsLimit = limit !== null;
+    const wantsOffset = offset !== null;
+
+    if (driver === "sqlsrv" && kind === "select") {
+      if (wantsLimit || wantsOffset) {
+        if (orderBy.length === 0) {
+          sql += " ORDER BY (SELECT NULL)";
+        }
+        if (wantsLimit && wantsOffset) {
+          sql += ` OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`;
+          this.#params.push(offset, limit);
+        } else if (wantsLimit) {
+          sql += ` OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY`;
+          this.#params.push(limit);
+        } else {
+          throw new SQLError(
+            "SQL Server requires a LIMIT when using OFFSET; add .limit(n)",
+          );
+        }
+      }
+    } else if (driver === "sqlsrv" && kind === "delete" && (wantsLimit || wantsOffset)) {
+      throw new SQLError(
+        "DELETE with LIMIT or OFFSET is not supported for SQL Server in this query builder",
+      );
+    } else {
+      if (wantsLimit) {
+        sql += ` LIMIT ?`;
+        this.#params.push(limit);
+      }
+
+      if (isset(limit) && isInteger(limit) && wantsOffset) {
+        sql += ` OFFSET ?`;
+        this.#params.push(offset);
+      }
     }
 
     this.#sql = sql;
-    this.#built = true;
+  }
+
+  /**
+   * Compile once and return SQL and bindings together (avoids two `#compileQuery` runs
+   * when you need both, unlike separate `toSql()` + `getBindings()`).
+   */
+  public getCompiledQuery(kind: "select" | "delete" = "select"): {
+    sql: string;
+    bindings: WherePrimitive[];
+  } {
+    this.#compileQuery(kind);
+    return { sql: this.#sql, bindings: this.#params };
   }
 
   public toSql() {
-    this.toSqlWithValues();
+    this.#compileQuery("select");
     return this.#sql;
   }
 
   public getBindings() {
-    this.toSqlWithValues();
+    this.#compileQuery("select");
     return this.#params;
   }
 
   public async get() {
-    const { sql, values } = {
-      sql: this.toSql(),
-      values: this.getBindings(),
-    };
-    const result = await this.database.runQuery<"select">(sql, values);
+    this.#compileQuery("select");
+    const result = await this.database.runQuery<"select">(this.#sql, this.#params);
     return result;
   }
 
   public async first() {
     this.limit(1);
-    const { sql, values } = {
-      sql: this.toSql(),
-      values: this.getBindings(),
-    };
-    const result = await this.database.runQuery<"select">(sql, values);
+    this.#compileQuery("select");
+    const result = await this.database.runQuery<"select">(this.#sql, this.#params);
     return result[0] || null;
   }
 
   public async count(): Promise<number> {
+    const lastSelect = [...this.fields];
     this.select(DB.raw("COUNT(*) AS count"));
-    const { sql, values } = {
-      sql: this.toSql(),
-      values: this.getBindings(),
-    };
+    this.#compileQuery("select");
+    const sql = this.#sql;
+    const values = this.#params;
     const result = await this.database.runQuery<"select">(sql, values);
+    this.fields = lastSelect;
     return Number(result[0]?.count || 0);
   }
 
   public async delete() {
-    this.toSqlWithValues("delete");
-    const { sql, values } = {
-      sql: this.#sql,
-      values: this.#params,
-    };
-    const result = await this.database.runQuery<"delete">(sql, values);
+    this.#compileQuery("delete");
+    const result = await this.database.runQuery<"delete">(this.#sql, this.#params);
     return result;
   }
 
@@ -1177,7 +1221,7 @@ export class Builder extends WhereInterpolator {
       ", "
     )}) VALUES ${placeholders}`;
 
-    if (this.dbUsed === "pgsql") {
+    if (this.database.getDriver() === "pgsql") {
       sql += " RETURNING *";
     }
 
@@ -1357,6 +1401,17 @@ export class Builder extends WhereInterpolator {
     } else {
       this.havingClauses.push([clause, values]);
     }
+  }
+
+  async paginate(page: number, perPage: number = 10, urlPath?: URL): Promise<Paginator<Record<string, unknown>>> {
+    const offset = (page - 1) * perPage;
+    this.limit(perPage);
+    this.offset(offset);
+    const data = await this.get();
+    this.limit(null);
+    this.offset(null);
+    const total = await this.count();
+    return new Paginator(data, total, page, perPage, urlPath);
   }
 }
 type HavingOperator =

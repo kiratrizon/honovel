@@ -12,7 +12,7 @@ import { IMyArtisan } from "../../../@types/IMyArtisan.d.ts";
 import * as path from "node:path";
 import PreventRequestDuringMaintenance from "Illuminate/Foundation/Http/Middleware/PreventRequestDuringMaintenance.ts";
 import { Encrypter, EnvUpdater } from "Illuminate/Encryption/index.ts";
-import { DatabaseHelper } from "Database";
+import { Database, DatabaseHelper } from "Database";
 import Seeder from "Illuminate/Database/Seeder.ts";
 import Boot from "./Boot.ts";
 import { createCA, createCert } from "mkcert";
@@ -20,9 +20,9 @@ import { dirname, basename } from "https://deno.land/std/path/mod.ts";
 
 const envs = [".env"];
 
-await Boot.init();
+await Boot.init(true);
 class MyArtisan {
-  constructor() {}
+  constructor() { }
   private async createConfig(options: { force?: boolean }, name: string) {
     const stubPath = honovelPath("stubs/ConfigDefault.stub");
     const stubContent = getFileContents(stubPath);
@@ -74,7 +74,7 @@ class MyArtisan {
 
     if (options.resource) {
       // remove the Controller in name
-      const paramName = name.replace("Controller", "");
+      const paramName = name.replace("Controller", "").toLowerCase();
       controllerContent = controllerContent.replace(
         /{{ paramName }}/g,
         paramName,
@@ -179,7 +179,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    
+
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -196,7 +196,7 @@ class MyArtisan {
         .where("name", name)
         .count();
       if (isApplied) {
-        console.info(`Migration ${name} already applied.`);
+        // console.info(`Migration ${name} already applied.`);
         continue;
       }
       migration.setConnection(options.db);
@@ -225,7 +225,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    
+
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -242,7 +242,7 @@ class MyArtisan {
         .where("name", name)
         .count();
       if (isApplied) {
-        console.info(`Migration ${name} already applied.`);
+        // console.info(`Migration ${name} already applied.`);
         continue;
       }
       migration.setConnection(options.db);
@@ -272,7 +272,7 @@ class MyArtisan {
     force: boolean;
     seeder?: string;
   }) {
-    
+
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -329,7 +329,7 @@ class MyArtisan {
         .where("name", name)
         .count();
       if (isApplied) {
-        console.info(`Migration ${name} already applied.`);
+        // console.info(`Migration ${name} already applied.`);
         continue;
       }
       migration.setConnection(options.db);
@@ -358,7 +358,7 @@ class MyArtisan {
     db: string;
     force: boolean;
   }) {
-    
+
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -415,7 +415,7 @@ class MyArtisan {
     db: string;
     force: boolean;
   }) {
-    
+
     if (!options.force) {
       await this.askIfDBNotExist(options.db);
     }
@@ -456,7 +456,7 @@ class MyArtisan {
   }
 
   private async migrationStatus(options: { path?: string; db: string }) {
-    
+
     await this.createMigrationTable(options.db);
 
     const allModules = await loadMigrationModules(options.path);
@@ -525,58 +525,123 @@ class MyArtisan {
   }
 
   private async dropAllTables(connection: string): Promise<void> {
+    const db = DB.connection(connection);
+    const dbType = db.getDriverName();
+  
     let tables: string[] = [];
-    const dbType = DB.connection(connection).getDriverName();
+  
     switch (dbType) {
       case "mysql": {
-        const result = await DB.connection(connection).select(
-          `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'`,
-          [config(`database.connections.${connection}.database`)],
+        const result = await db.select(
+          `SELECT table_name
+           FROM information_schema.tables
+           WHERE table_schema = ?
+           AND table_type = 'BASE TABLE'`,
+          [config(`database.connections.${connection}.database`)]
         );
+  
         tables = result.map((row) => `\`${row.TABLE_NAME}\``);
         break;
       }
-
+  
       case "pgsql": {
-        const result = await DB.connection(connection).select(
-          `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user`,
+        const result = await db.select(
+          `SELECT tablename
+           FROM pg_tables
+           WHERE schemaname = 'public'`
         );
+  
         tables = result.map((row) => `"${row.tablename}"`);
         break;
       }
-
+  
       case "sqlite": {
-        const result = await DB.connection(connection).select(
-          `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
+        const result = await db.select(
+          `SELECT name
+           FROM sqlite_master
+           WHERE type = 'table'
+           AND name NOT LIKE 'sqlite_%'`
         );
+  
         tables = result.map((row) => `"${row.name}"`);
         break;
       }
-
+  
       case "sqlsrv": {
-        const result = await DB.connection(connection).select(
-          `SELECT name FROM sys.tables`,
+        const result = await db.select(
+          `SELECT name FROM sys.tables`
         );
+  
         tables = result.map((row) => `[${row.name}]`);
         break;
       }
-
+  
       default:
-        throw new Error(`Unsupported DB type: \`${dbType}\``);
+        throw new Error(`Unsupported DB type: ${dbType}`);
     }
-
+  
     if (tables.length === 0) {
       console.info("⚠️ No tables found to drop.");
       return;
     }
-
-    if (dbType === "sqlite") {
-      for (const table of tables) {
-        await DB.connection(connection).statement(`DROP TABLE ${table};`);
+  
+    try {
+      switch (dbType) {
+        case "sqlite": {
+          await db.statement(`PRAGMA foreign_keys = OFF`);
+  
+          for (const table of tables) {
+            await db.statement(`DROP TABLE ${table}`);
+          }
+  
+          break;
+        }
+  
+        case "mysql": {
+          await db.statement(`SET FOREIGN_KEY_CHECKS = 0`);
+  
+          const dropSQL = `DROP TABLE ${tables.join(", ")}`;
+          await db.statement(dropSQL);
+  
+          break;
+        }
+  
+        case "pgsql": {
+          const dropSQL = `DROP TABLE ${tables.join(", ")} CASCADE`;
+          await db.statement(dropSQL);
+  
+          break;
+        }
+  
+        case "sqlsrv": {
+          await db.statement(`
+            EXEC sp_msforeachtable
+            'ALTER TABLE ? NOCHECK CONSTRAINT all'
+          `);
+  
+          const dropSQL = `DROP TABLE ${tables.join(", ")}`;
+          await db.statement(dropSQL);
+  
+          break;
+        }
       }
-    } else {
-      const dropSQL = `DROP TABLE ${tables.join(", ")};`;
-      await DB.connection(connection).statement(dropSQL);
+    } finally {
+      switch (dbType) {
+        case "sqlite":
+          await db.statement(`PRAGMA foreign_keys = ON`);
+          break;
+  
+        case "mysql":
+          await db.statement(`SET FOREIGN_KEY_CHECKS = 1`);
+          break;
+  
+        case "sqlsrv":
+          await db.statement(`
+            EXEC sp_msforeachtable
+            'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all'
+          `);
+          break;
+      }
     }
   }
 
@@ -696,6 +761,7 @@ class MyArtisan {
         "./deno.json",
         "-A",
         `--watch${watchFlag}`,
+        `--watch-exclude=vite.ts`,
         serverPath,
       ],
       stdout: "inherit",
@@ -928,8 +994,14 @@ class MyArtisan {
   }
 
   private async routeList() {
-    console.log("Route list command is not yet implemented.");
-    console.log("This feature will be available in a future release.");
+    const routesPath = storagePath("framework/route/routes.json");
+    if (await pathExist(routesPath)) {
+      const routes = getFileContents(routesPath);
+      const prettyRoutes = JSON.parse(routes);
+      console.log(prettyRoutes);
+    } else {
+      console.log("Routes file does not exist.");
+    }
   }
 
   private async cacheClear() {
@@ -1016,13 +1088,35 @@ class MyArtisan {
       console.log(
         `Please add this to your bootstrap/app.ts file under withRouting({}):`
       );
-  
+
       // Entire import line in yellow
       console.log("\x1b[33m%s\x1b[0m", 'api: async () => await import("../routes/api.ts"),');
     }
   }
 
   public async command(args: string[]): Promise<void> {
+    const commandName = args.find((arg) => !arg.startsWith("-")) || "";
+    const dbCommands = new Set([
+      "db:seed",
+      "migrate",
+      "migrate:fresh",
+      "migrate:refresh",
+      "migrate:rollback",
+      "migrate:reset",
+      "migrate:status",
+      "cache:clear",
+      "config:cache",
+      "config:clear",
+      "optimize",
+      "optimize:clear",
+      "down",
+      "up",
+    ]);
+
+    if (dbCommands.has(commandName)) {
+      await Database.init(true);
+    }
+
     await myCommand
       .name("deno task")
       .description("Honovel CLI")
@@ -1041,7 +1135,7 @@ class MyArtisan {
       )
 
       .command("install:api", "Install the API routes")
-      .action(()=>this.installApi())
+      .action(() => this.installApi())
 
       .command("install:driver", "Install optional database/cache drivers")
       .option(
@@ -1205,7 +1299,7 @@ class MyArtisan {
       .arguments("<name:string>")
       .action((_: unknown, name: string) => this.makeException(name))
 
-      .command("route:list", "List all registered routes")
+      .command("route:list", "List all named routes")
       .action(() => this.routeList())
 
       .command("cache:clear", "Clear the application cache")
