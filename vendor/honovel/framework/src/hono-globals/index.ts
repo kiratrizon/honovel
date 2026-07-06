@@ -11,7 +11,7 @@ try {
       Deno.env.set(key, value);
     }
   }
-} catch (_) { }
+} catch (_) {}
 
 if (Deno.env.get("VERCEL") == "1") {
   Deno.env.set("DENO_DEPLOYMENT_ID", Deno.env.get("VERCEL_URL") || "");
@@ -331,18 +331,12 @@ globalFn("getConfigStore", async function (): Promise<Record<string, unknown>> {
 
 define("myConfigData", await getConfigStore(), false);
 const configure = new Constants(myConfigData as Record<string, unknown>);
-globalFn(
-  "config",
-  function (
-    key: string,
-    defaultValue: unknown = null,
-  ) {
-    if (isString(key)) {
-      return configure?.read(key, defaultValue) ?? defaultValue;
-    }
-    throw new Error("Invalid key");
-  },
-);
+globalFn("config", function (key: string, defaultValue: unknown = null) {
+  if (isString(key)) {
+    return configure?.read(key, defaultValue) ?? defaultValue;
+  }
+  throw new Error("Invalid key");
+});
 
 globalFn("viewPath", function (concatenation = "") {
   const dir = path.join(
@@ -379,23 +373,20 @@ globalFn("ucFirst", function (str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 });
 
-globalFn(
-  "pathExist",
-  async function (fileString: string = ""): Promise<boolean> {
-    if (fileString === "") {
+globalFn("pathExists", function (fileString: string = ""): boolean {
+  if (fileString === "") {
+    return false;
+  }
+  try {
+    Deno.statSync(fileString);
+    return true;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
       return false;
     }
-    try {
-      await Deno.stat(fileString);
-      return true;
-    } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
-        return false;
-      }
-      throw err;
-    }
-  },
-);
+    throw err;
+  }
+});
 
 globalFn("makeDir", function (dirString = "") {
   if (dirString === "") {
@@ -447,6 +438,30 @@ globalFn("readFile", (filePath: string = ""): Uint8Array => {
   }
 
   return Deno.readFileSync(filePath); // Read file as Uint8Array
+});
+
+globalFn("isFile", function (fileString = ""): boolean {
+  if (fileString === "") {
+    return false;
+  }
+  try {
+    const stats = Deno.statSync(fileString);
+    return stats.isFile;
+  } catch {
+    return false;
+  }
+});
+
+globalFn("isDir", function (dirString = ""): boolean {
+  if (dirString === "") {
+    return false;
+  }
+  try {
+    const stats = Deno.statSync(dirString);
+    return stats.isDirectory;
+  } catch {
+    return false;
+  }
 });
 
 import pluralize from "pluralize";
@@ -583,8 +598,8 @@ globalFn("strToTime", function (time, now) {
 });
 
 globalFn("date", function (format: string, unixTimestamp = null) {
-  const result = Carbon.createFromTimestamp(unixTimestamp, format);
-  return result.toString();
+  const result = Carbon.createFromTimestamp(unixTimestamp, format).toString();
+  return result;
 });
 
 globalFn("time", () => {
@@ -741,7 +756,7 @@ globalFn(
     value: any,
     destination: string = "debug",
     identifier: string = "",
-  ) { },
+  ) {},
 );
 
 // import process from "node:process";
@@ -753,7 +768,23 @@ globalFn(
 // });
 
 globalFn("isURL", function (url: string) {
-  return /^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$/.test(url);
+  return /^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$/.test(
+    url,
+  );
+});
+
+globalFn("sprintf", (format: string, ...args: unknown[]): string => {
+  const placeholders = (format.match(/%s/g) || []).length;
+
+  if (args.length !== placeholders) {
+    throw new Error(
+      `sprintf() expects ${placeholders} argument(s), got ${args.length}.`,
+    );
+  }
+
+  let i = 0;
+
+  return format.replace(/%s/g, () => String(args[i++]));
 });
 
 DB.init();

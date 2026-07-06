@@ -16,9 +16,7 @@ import {
   WherePrimitive,
 } from "../Query/index.ts";
 
-export default class Model<
-  T extends ModelAttributes = ModelAttributes,
-> {
+export default class Model<T extends ModelAttributes = ModelAttributes> {
   constructor(attributes: Partial<T> = {}) {
     this.fill(attributes as T);
   }
@@ -633,7 +631,11 @@ export default class Model<
     }).whereRaw(raw, bindings);
   }
 
-  public static async paginate(page: number, perPage: number = 10, urlPath?: URL): Promise<Paginator<Record<string, unknown>>> {
+  public static async paginate(
+    page: number,
+    perPage: number = 10,
+    urlPath?: URL,
+  ): Promise<Paginator<Record<string, unknown>>> {
     return await new Builder({
       model: this,
       fields: ["*"],
@@ -841,10 +843,25 @@ export default class Model<
   }
 
   /**
+   * Add a raw ORDER BY expression to the query.
+   * @param raw A SQLRaw expression; pass user values as `?` placeholders.
+   * @param bindings Values bound to the placeholders in `raw`, in order.
+   * @returns The query builder instance.
+   */
+  public static orderByRaw(raw: SQLRaw, bindings: unknown[] = []): Builder {
+    return new Builder({
+      model: this,
+      fields: ["*"],
+    }).orderByRaw(raw, bindings);
+  }
+
+  /**
    * Get all records from the database.
    * @returns An array of model instances.
    */
-  public static async all<T extends typeof Model = typeof Model>(): Promise<Collection<InstanceType<T>>> {
+  public static async all<T extends typeof Model = typeof Model>(): Promise<
+    Collection<InstanceType<T>>
+  > {
     return await new Builder({
       model: this,
       fields: ["*"],

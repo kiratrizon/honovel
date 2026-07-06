@@ -315,7 +315,7 @@ declare class HonoRequest {
   dispose(): Promise<void>;
 
   /** Validate request data with rules */
-  validate<T extends Record<string, string>>(
+  validate<T extends Record<string, any>>(
     validations: T,
 
     /**
@@ -327,7 +327,7 @@ declare class HonoRequest {
      * }
      */
     messages?: Record<string, string>,
-  ): Promise<Record<keyof T | string, string>>;
+  ): Promise<Record<keyof T | string, any>>;
 
   /** Bind route parameters to request */
   public bindRoute(params: Record<string, ModelConstructor>): void;
@@ -346,6 +346,38 @@ declare class HonoRequest {
    * @param key
    */
   public get(key: string): unknown;
+
+  /**
+   * Set the language for the request
+   * @param lang
+   */
+  public setLanguage(lang?: string): void;
+
+  /**
+   * Set the fallback language for the request
+   * @param lang
+   */
+  public setFallbackLanguage(lang?: string): void;
+
+  /**
+   * Get the language for the request
+   * @param lang
+   */
+  public getLanguage(): string;
+
+  /**
+   * Get the fallback language for the request
+   * @param lang
+   */
+  public getFallbackLanguage(): string;
+
+  /**
+   * Internationalization (i18n) translation function
+   * @param key The translation key
+   * @param replacements Optional replacements for placeholders in the translation string
+   * @returns The translated string
+   */
+  public __(key: string, replacements?: Record<string, string>): string;
 }
 
 export default HonoRequest;
