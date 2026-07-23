@@ -84,6 +84,9 @@ export default class SessionGuard extends BaseGuard {
     if (!user) {
       return false;
     }
+    if (!user.getAuthPassword()) {
+      return false;
+    }
     if (!Hash.check(credentials[passwordKey], user.getAuthPassword())) {
       return false;
     }
@@ -120,6 +123,7 @@ export default class SessionGuard extends BaseGuard {
 
       Cookie.queue(sessguardKey, rememberToken, {
         maxAge: 30 * 24 * 60 * 60, // 30 days
+        path: "/",
       });
       this.rememberUser = true;
     }
@@ -134,6 +138,7 @@ export default class SessionGuard extends BaseGuard {
     request.session.forget(sessguardKey);
     Cookie.queue(sessguardKey, "", {
       maxAge: -1, // Delete the cookie
+      path: "/",
     });
     // @ts-ignore //
     this.c.set("auth_user", null);

@@ -10,6 +10,8 @@ import Boot from "../Maneuver/Boot.ts";
 import { HonoType } from "../../../@types/declaration/imain.d.ts";
 
 import { INRoute } from "../../../@types/declaration/IRoute.d.ts";
+
+import { methodOverride } from "hono/method-override";
 import {
   buildRequestInit,
   regexToHono,
@@ -18,9 +20,11 @@ import {
   toMiddleware,
   URLArranger,
   toFallback,
+  toNotfound,
   returnResponse,
   exceptionToResponse,
 } from "./Support/FunctionRoute.ts";
+import type HttpHono from "HttpHono";
 import { IMyConfig } from "./Support/MethodRoute.ts";
 import { honoSession } from "HonoHttp/HonoSession.ts";
 import { Route as Router } from "Illuminate/Support/Facades/index.ts";
@@ -234,6 +238,10 @@ class Server {
 
   private static console: RouterLoader;
 
+  private static routeFallbacks: Record<
+    string,
+    ((param: HttpHono) => Promise<void>) | null
+  > = {};
   public static routes: Record<
     string,
     {
@@ -317,6 +325,9 @@ class Server {
       await providerInstance.boot();
     }
     await Boot.finalInit();
+
+    // phpmyadmin logic
+    // put PHPMYADMIN_HOST in env in order to embed phpmyadmin in the app
     if (isset(env("PHPMYADMIN_HOST"))) {
       this.app.get("/myadmin", async (c: MyContext) => {
         return c.redirect("/myadmin/", 301);
@@ -329,6 +340,14 @@ class Server {
 
         const headers = new Headers(c.req.raw.headers);
 
+        headers.set("Host", new URL(targetUrl).host);
+        headers.set("X-Forwarded-Host", c.req.header("host") ?? "");
+        headers.set(
+          "X-Forwarded-Proto",
+          isFile(storagePath("ssl/cert.pem")) ? "https" : "http",
+        );
+        headers.set("X-Forwarded-Port", String(env("APP_PORT")));
+
         // Clone body safely (handle GET without body)
         let body: BodyInit | null = null;
         if (c.req.method !== "GET" && c.req.method !== "HEAD") {
@@ -340,13 +359,28 @@ class Server {
           method: c.req.method,
           headers,
           body,
+          redirect: "manual",
         });
 
-        // Clone response headers safely (some need to be removed)
         const responseHeaders = new Headers(response.headers);
-        responseHeaders.delete("content-encoding"); // remove problematic headers if needed
+
+        // Remove problematic headers
+        responseHeaders.delete("content-encoding");
+        responseHeaders.delete("content-length");
+
+        // Rewrite redirects to stay under /myadmin
+        const location = responseHeaders.get("location");
+        if (location) {
+          const url = new URL(location, env("PHPMYADMIN_HOST") as string);
+
+          responseHeaders.set(
+            "location",
+            `/myadmin${url.pathname}${url.search}${url.hash}`,
+          );
+        }
 
         const responseBody = await response.arrayBuffer();
+
         return new Response(responseBody, {
           status: response.status,
           headers: responseHeaders,
@@ -374,6 +408,7 @@ class Server {
     const asterisk = "*";
 
     if (withDefaults) {
+      app.use(asterisk, methodOverride({ app }));
       app.use(...myStaticDefaults);
       app.use(asterisk, async (c: MyContext, next: () => Promise<void>) => {
         c.set("subdomain", {});
@@ -445,6 +480,7 @@ class Server {
     for (const [key, val] of Object.entries(ordered)) {
       if (key == "commands") {
         this.console = val;
+        continue;
       }
       try {
         await val();
@@ -465,7 +501,11 @@ class Server {
           defaultRoute,
           defaultResource,
           resourceReferrence,
+          fallback,
         } = allGroup;
+        if (isset(fallback)) {
+          this.routeFallbacks[key] = fallback;
+        }
         if (isset(methods) && !empty(methods)) {
           if (!empty(defaultResource)) {
             for (const di of defaultResource) {
@@ -806,23 +846,6 @@ class Server {
               }
             }
           }
-          // @ts-ignore //
-          // if (Route.fallbackFn) {
-          //   byEndpointsRouter.use(
-          //     // @ts-ignore //
-          //     toNotfound(
-          //       {
-          //         // @ts-ignore //
-          //         args: Route.fallbackFn,
-          //         // @ts-ignore //
-          //         debugString: Route.fallbackFn.toString(),
-          //       },
-          //       []
-          //     )
-          //   );
-          //   // @ts-ignore //
-          //   Route.fallbackFn = null; // reset after applying
-          // }
           this.app.route(routePrefix, byEndpointsRouter);
         } else {
           console.error("No routes found");
@@ -832,10 +855,47 @@ class Server {
   }
 
   private static async endInit() {
-    this.app.notFound(async function (c: MyContext) {
-      const notFoundInstance = new NotFoundHttpException();
-      return await exceptionToResponse(c, notFoundInstance);
-    });
+    if (!empty(this.routeFallbacks)) {
+      // @ts-ignore //
+      const groupRoutesMain = GroupRoute.groupRouteMain as Record<
+        string,
+        { middleware: string[]; prefix?: string }
+      >;
+      const fallbackEntries = Object.entries(this.routeFallbacks)
+        .filter(([, fn]) => isset(fn))
+        .map(([key, fn]) => ({
+          prefix: groupRoutesMain[key]?.prefix || "/",
+          fn: fn as (param: HttpHono) => Promise<void>,
+        }))
+        .sort((a, b) => b.prefix.length - a.prefix.length);
+
+      this.app.notFound(async (c: MyContext) => {
+        const path = c.req.path;
+        const matched = fallbackEntries.find(
+          ({ prefix }) =>
+            prefix === "/" || path === prefix || path.startsWith(`${prefix}/`),
+        );
+
+        if (!matched) {
+          const notFoundInstance = new NotFoundHttpException();
+          return await exceptionToResponse(c, notFoundInstance);
+        }
+        const handler = toNotfound(
+          {
+            debugString: "Route::fallback",
+            // @ts-ignore //
+            args: matched.fn,
+          },
+          [],
+        );
+        return (await handler(c, async () => {})) as Response;
+      });
+    } else {
+      this.app.notFound(async function (c: MyContext) {
+        const notFoundInstance = new NotFoundHttpException();
+        return await exceptionToResponse(c, notFoundInstance);
+      });
+    }
 
     const ServerDomainKeys = Object.keys(this.domainPattern); // ["web", "api"]
     ServerDomainKeys.forEach((key) => {
