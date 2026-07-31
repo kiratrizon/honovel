@@ -138,13 +138,24 @@ export class Database {
     }
     if (force) {
       // Backs reconnect(): discard the built pools so the next query rebuilds
-      // them. Callers wanting the old pools closed should run dbCloser first —
+      // them. Use closeConnections() first if the old pools should be shut down —
       // the previous eager init did not close them either, it appended a second
       // set of pools to the same arrays on every forced re-init.
-      Database.connections = {};
-      Database.building = {};
+      Database.resetConnections();
     }
     Database.doneInit = true;
+  }
+
+  /**
+   * Forget every built pool so the next query rebuilds from config.
+   *
+   * Clears the in-flight memo too — dropping a connection from `connections`
+   * without clearing `building` would leave ensureConnection() short-circuiting
+   * on a resolved promise and never rebuilding.
+   */
+  public static resetConnections(): void {
+    Database.connections = {};
+    Database.building = {};
   }
 
   // In-flight builds keyed by connection name. Two requests arriving together on
@@ -722,32 +733,43 @@ export class Database {
   }
 }
 
-export const dbCloser = async () => {
+/**
+ * Close every pool this process opened and reset the registry.
+ *
+ * A connection's `read` and `write` are the *same array* unless it configures
+ * them separately (always so for pgsql and sqlsrv), so the pools are
+ * de-duplicated by identity first. Spreading both arrays closed every pool
+ * twice, and the second close fails on an already-closed pool.
+ *
+ * Safe to call without exiting the process — see dbCloser for the signal
+ * handler that does exit.
+ */
+export const closeConnections = async (): Promise<void> => {
   const logging = config("app").debug;
-  const entries = Object.entries(Database.connections);
-  for (const [, connections] of entries) {
+  for (const connections of Object.values(Database.connections)) {
     const driver = connections.driver;
+    const pools = [
+      ...new Set<unknown>([...connections.read, ...connections.write]),
+    ];
     switch (driver as SupportedDrivers) {
       case "mysql":
       case "pgsql":
-        for (const pool of [...connections.read, ...connections.write]) {
-          await (pool as MPool | PgPool)
-            .end()
-            .then(() => {
-              if (logging) {
-                console.log(`Closed ${driver} pool successfully.`);
-              }
-            })
-            .catch((err: Error) => {
-              if (logging) {
-                console.error(`Error closing ${driver} pool:`, err);
-              }
-            });
+        for (const pool of pools) {
+          try {
+            await (pool as MPool | PgPool).end();
+            if (logging) {
+              console.log(`Closed ${driver} pool successfully.`);
+            }
+          } catch (err) {
+            if (logging) {
+              console.error(`Error closing ${driver} pool:`, err);
+            }
+          }
         }
         break;
       case "sqlite":
         // Close SQLite database connections
-        for (const db of [...connections.read, ...connections.write]) {
+        for (const db of pools) {
           try {
             // @ts-ignore - SQLite Database has close() method
             db.close();
@@ -763,19 +785,17 @@ export const dbCloser = async () => {
         break;
       case "sqlsrv":
         // Close SQL Server connection pools
-        for (const pool of [...connections.read, ...connections.write]) {
-          await (pool as MssqlConnectionPool)
-            .close()
-            .then(() => {
-              if (logging) {
-                console.log(`Closed sqlsrv pool successfully.`);
-              }
-            })
-            .catch((err: Error) => {
-              if (logging) {
-                console.error(`Error closing sqlsrv pool:`, err);
-              }
-            });
+        for (const pool of pools) {
+          try {
+            await (pool as MssqlConnectionPool).close();
+            if (logging) {
+              console.log(`Closed sqlsrv pool successfully.`);
+            }
+          } catch (err) {
+            if (logging) {
+              console.error(`Error closing sqlsrv pool:`, err);
+            }
+          }
         }
         break;
       default:
@@ -783,6 +803,12 @@ export const dbCloser = async () => {
         break;
     }
   }
+  Database.resetConnections();
+};
+
+/** SIGINT handler: close every pool, then exit. */
+export const dbCloser = async () => {
+  await closeConnections();
   Deno.exit(0);
 };
 
