@@ -21,20 +21,18 @@ const constant: DatabaseConfig = {
       driver: "sqlite",
       database: databasePath("database.sqlite"),
     },
-    sqlite2: {
-      driver: "sqlite",
-      database: databasePath("database2.sqlite"),
-    },
-    mysql2: {
-      driver: "mysql",
-      host: env("LOCAL_DB_HOST", "127.0.0.1"),
-      port: env("LOCAL_DB_PORT", 3307),
-      user: env("LOCAL_DB_USERNAME", "kira"),
-      password: env("LOCAL_DB_PASSWORD", "asterda23"),
-      database: env("LOCAL_DB_DATABASE", "honovel"),
-      charset: "utf8mb4",
+    sqlsrv: {
+      driver: "sqlsrv",
+      host: env("MSSQL_HOST", "127.0.0.1"),
+      port: env("MSSQL_PORT", 1433),
+      user: env("MSSQL_USERNAME", "sa"),
+      password: env("MSSQL_PASSWORD", ""),
+      database: env("MSSQL_DATABASE", "honovel"),
       options: {
-        maxConnection: 10,
+        // Local SQL Server images ship a self-signed certificate, so the
+        // handshake fails unless the client is told to accept it.
+        encrypt: env("MSSQL_ENCRYPT", false),
+        trustServerCertificate: env("MSSQL_TRUST_CERT", true),
       },
     },
   },

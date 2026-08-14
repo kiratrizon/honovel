@@ -1,6 +1,4 @@
-// Driver packages are loaded on demand via ./drivers.ts so that an app only pays
-// to instantiate the driver it actually uses. Everything imported here is
-// type-only and erases at runtime.
+// Driver packages load on demand via ./drivers.ts; imports here are type-only.
 
 // mysql
 import type { ConnectionOptions, Pool as MPool } from "mysql2/promise";
@@ -28,10 +26,8 @@ import {
   TableSchema,
 } from "Illuminate/Database/Schema/index.ts";
 
-import {
-  QueryResult,
-  QueryResultDerived,
-} from "./databaseTypes.ts";
+import { QueryResult, QueryResultDerived } from "./databaseTypes.ts";
+import { QueryException } from "Illuminate/Database/Query/index.ts";
 
 type TInsertOrUpdateBuilder = {
   table: string;
@@ -51,7 +47,14 @@ export class Database {
     }
   > = {};
   private readonly dbUsed: SupportedDrivers;
-  constructor(private connection: string) {
+
+  /**
+   * @param pinned a connection that must be run when transaction begins.
+   */
+  constructor(
+    private connection: string,
+    private readonly pinned?: unknown,
+  ) {
     this.dbUsed = config("database").connections[this.connection]
       .driver as SupportedDrivers;
     if (!["mysql", "sqlite", "pgsql", "sqlsrv"].includes(this.dbUsed)) {
@@ -90,10 +93,13 @@ export class Database {
     if (queryDriver) {
       const queryType = newQuery.trim().split(" ")[0].toLowerCase();
       const isReadQuery = Database.readQueries.includes(queryType);
+      // pinned wins over the pool and over the read/write split
       const useClient = isReadQuery
         ? Database.connections[this.connection].read
         : Database.connections[this.connection].write;
-      const client = useClient[Math.floor(Math.random() * useClient.length)];
+      const client = isset(this.pinned)
+        ? this.pinned
+        : useClient[Math.floor(Math.random() * useClient.length)];
       if (!client) {
         throw new Error(
           `No ${dbType} client available for ${
@@ -106,8 +112,14 @@ export class Database {
         // @ts-ignore //
         return await queryDriver.query(client, newQuery, newParams);
       } catch (error) {
-        console.error(`Query failed: ${newQuery}`, `Params:`, newParams);
-        throw error;
+        // one catchable type per driver; driver error kept as `cause`
+        throw new QueryException(
+          (error as Error)?.message ?? String(error),
+          newQuery,
+          newParams,
+          this.connection,
+          error,
+        );
       }
     }
     throw new Error(`Unsupported database driver: ${dbType}`);
@@ -164,7 +176,10 @@ export class Database {
 
   /** Build the pools for a single connection, once, on first use. */
   public static async ensureConnection(key: string): Promise<void> {
-    if (isset(Database.connections[key]) && !empty(Database.connections[key].write)) {
+    if (
+      isset(Database.connections[key]) &&
+      !empty(Database.connections[key].write)
+    ) {
       return;
     }
     if (!(key in Database.building)) {
@@ -290,9 +305,7 @@ export class Database {
               if (defaultOptions?.dateStrings) {
                 poolParams.dateStrings = true;
               }
-              Database.connections[key].read.push(
-                mysql.createPool(poolParams),
-              );
+              Database.connections[key].read.push(mysql.createPool(poolParams));
             });
           }
         }
@@ -339,8 +352,7 @@ export class Database {
       case "sqlite": {
         const forSQLite = value;
         if (isset(forSQLite)) {
-          const dbPath =
-            forSQLite.database || databasePath("database.sqlite");
+          const dbPath = forSQLite.database || databasePath("database.sqlite");
           if (!dbPath) {
             throw new Error("Database path is not configured.");
           }
@@ -368,13 +380,15 @@ export class Database {
             forSQLServer.options;
           for (const host of defaultHosts) {
             const pool = new mssql.ConnectionPool({
-              host,
+              server: host,
               port: defaultPort,
               user: defaultUser,
               password: defaultPassword,
               database: defaultDatabase,
               options: defaultOptions,
             });
+            // connect to pool first
+            await pool.connect();
             Database.connections[key].write.push(pool);
           }
           Database.connections[key].read = Database.connections[key].write;
@@ -581,32 +595,50 @@ export class Database {
 
     const placeholders = `(${columns.map(() => "?").join(", ")})`;
 
+    const quotedKeys = uniqueKeys.map((key) => this.quoteIdentifier(key));
+
     let sql = `INSERT INTO ${this.quoteIdentifier(input.table)} (${columns.join(
       ", ",
     )}) VALUES ${placeholders}`;
 
     if (this.dbUsed === "mysql") {
       const updates = columns
-        .filter((col) => !uniqueKeys.includes(col))
+        .filter((col) => !quotedKeys.includes(col))
         .map((col) => `${col}=VALUES(${col})`)
         .join(", ");
       sql += ` ON DUPLICATE KEY UPDATE ${updates}`;
     } else if (this.dbUsed === "pgsql") {
       const updates = columns
-        .filter((col) => !uniqueKeys.includes(col))
+        .filter((col) => !quotedKeys.includes(col))
         .map((col) => `${col}=EXCLUDED.${col}`)
         .join(", ");
-      sql += ` ON CONFLICT (${uniqueKeys.join(", ")}) DO UPDATE SET ${updates}`;
+      sql += ` ON CONFLICT (${quotedKeys.join(", ")}) DO UPDATE SET ${updates}`;
     } else if (this.dbUsed === "sqlite") {
       const updates = columns
-        .filter((col) => !uniqueKeys.includes(col))
+        .filter((col) => !quotedKeys.includes(col))
         .map((col) => `${col}=excluded.${col}`)
         .join(", ");
-      sql += ` ON CONFLICT (${uniqueKeys.join(", ")}) DO UPDATE SET ${updates}`;
+      sql += ` ON CONFLICT (${quotedKeys.join(", ")}) DO UPDATE SET ${updates}`;
     } else if (this.dbUsed === "sqlsrv") {
-      throw new Error(
-        "Insert or Update is not natively supported in SQL Server in this builder.",
-      );
+      // make logic sql for sqlsrv during insert or update
+      const onClause = quotedKeys
+        .map((key) => `target.${key} = source.${key}`)
+        .join(" AND ");
+      const updates = columns
+        .filter((col) => !quotedKeys.includes(col))
+        .map((col) => `target.${col} = source.${col}`)
+        .join(", ");
+      const columnList = columns.join(", ");
+      const sourceList = columns.map((col) => `source.${col}`).join(", ");
+
+      // use holdlock
+      sql =
+        `MERGE ${this.quoteIdentifier(input.table)} WITH (HOLDLOCK) AS target ` +
+        `USING (VALUES ${placeholders}) AS source (${columnList}) ` +
+        `ON ${onClause} ` +
+        // if nothing to update, omit instead
+        (updates ? `WHEN MATCHED THEN UPDATE SET ${updates} ` : "") +
+        `WHEN NOT MATCHED THEN INSERT (${columnList}) VALUES (${sourceList});`;
     }
 
     return [sql, values];
@@ -731,6 +763,68 @@ export class Database {
 
     return [sql, values];
   }
+
+  /** Pin one write connection until released. sqlsrv also returns control hooks. */
+  public static async acquire(key: string): Promise<AcquiredConnection> {
+    await Database.ensureConnection(key);
+    const entry = Database.connections[key];
+    if (!isset(entry) || empty(entry.write)) {
+      throw new Error(`No write connection available for "${key}".`);
+    }
+    const pool = entry.write[Math.floor(Math.random() * entry.write.length)];
+
+    switch (entry.driver) {
+      case "mysql": {
+        // mysql2: a PoolConnection, which MySQL.query already accepts.
+        // deno-lint-ignore no-explicit-any
+        const conn = await (pool as any).getConnection();
+        return { client: conn, release: () => conn.release() };
+      }
+      case "pgsql": {
+        // deno-lint-ignore no-explicit-any
+        const conn = await (pool as any).connect();
+        return { client: conn, release: () => conn.release() };
+      }
+      case "sqlite": {
+        // A file handle, not a pool — already exclusive, nothing to release.
+        return { client: pool, release: () => {} };
+      }
+      case "sqlsrv": {
+        // pool.request() gives an arbitrary connection, so raw BEGIN pins nothing.
+        // node-mssql drives transactions by method; Transaction has request(),
+        // which is all MsSQL.query needs.
+        const mssql = await loadMssql();
+        const tx = new mssql.Transaction(pool);
+        return {
+          client: tx,
+          // Ownership of the underlying connection returns to the pool when the
+          // transaction settles, so there is nothing to release separately.
+          release: () => {},
+          begin: () => tx.begin(),
+          commit: () => tx.commit(),
+          rollback: () => tx.rollback(),
+        };
+      }
+      default:
+        throw new Error(
+          `Transactions are not implemented for the "${entry.driver}" driver.`,
+        );
+    }
+  }
+}
+
+/** What acquire() hands back for a transaction. */
+export interface AcquiredConnection {
+  /** Pinned connection every query in the transaction must run on. */
+  client: unknown;
+  release: () => void;
+  /**
+   * Driver-specific transaction control. When omitted the caller issues plain
+   * BEGIN / COMMIT / ROLLBACK statements instead.
+   */
+  begin?: () => Promise<unknown>;
+  commit?: () => Promise<unknown>;
+  rollback?: () => Promise<unknown>;
 }
 
 /**

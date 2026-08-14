@@ -96,9 +96,6 @@ class MsSQL {
       } as QueryResultDerived[T];
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
-      console.error("SQL Server Error:", error.message);
-      console.error("Query:", query);
-      console.error("Params:", params);
       throw error;
     }
   }
