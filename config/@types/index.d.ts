@@ -667,12 +667,6 @@ export interface CacheConfig {
 //  console.log(dbConfig.default); // "mysql", "pgsql", "sqlite", or "sqlsrv"
 // })
 
-export interface JWTProviders {
-  jwt: string;
-  auth: string;
-  storage: string;
-}
-
 export type JWTRequiredClaims = "iss" | "iat" | "exp" | "nbf" | "sub" | "jti";
 
 export interface JWTConfig {
@@ -685,7 +679,7 @@ export interface JWTConfig {
   blacklist_grace_period: number; // grace period in seconds
   issuer: string; // token issuer
   audience: string[]; // token audience
-  providers: JWTProviders;
+  blacklist_store?: string | null; // cache store holding the blacklist; null => default store
 }
 interface DiskConfig {
   root: string;

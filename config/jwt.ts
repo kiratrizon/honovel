@@ -89,11 +89,21 @@ const constant: JWTConfig = {
   issuer: env("JWT_ISSUER", ""), // Optional, can be set to your application name or URL
   audience: env("JWT_AUDIENCE", ["*"]), // Optional, can be set to your application's audience most likely from your allowed ORIGINS
 
-  providers: {
-    jwt: "Tymon.JWTAuth.Providers.JWT.Namshi", // Replace with your JS equivalents if any
-    auth: "Tymon.JWTAuth.Providers.Auth.Illuminate", // or your own provider classes/modules
-    storage: "Tymon.JWTAuth.Providers.Storage.Illuminate",
-  },
+  /*
+    |--------------------------------------------------------------------------
+    | JWT Blacklist Store
+    |--------------------------------------------------------------------------
+    |
+    | Which cache store from config("cache").stores holds the blacklist.
+    | Leave null to use the application's default cache store.
+    |
+    | Note: the "memory" and "object" drivers are per-process and are lost on
+    | restart, so a blacklist kept there will not survive a redeploy or be
+    | shared between workers. Point this at "redis", "database" or "file" if
+    | you enable the blacklist in production.
+    |
+    */
+  blacklist_store: env("JWT_BLACKLIST_STORE", null),
 };
 
 export default constant;
