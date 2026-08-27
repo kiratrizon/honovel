@@ -10,6 +10,7 @@ export type UserSchema = {
   password: string;
   name: string;
   api_token?: string;
+  remember_token?: string;
 };
 
 class User extends Authenticatable<UserSchema> implements JWTSubject {
@@ -19,6 +20,7 @@ class User extends Authenticatable<UserSchema> implements JWTSubject {
     "password",
     "name",
     "api_token",
+    "remember_token",
   ];
   protected static override _guarded: string[] = [];
 

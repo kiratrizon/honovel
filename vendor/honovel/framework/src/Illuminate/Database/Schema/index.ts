@@ -987,8 +987,6 @@ export class Blueprint {
         parts.push("AUTO_INCREMENT");
       } else if (this.connection === "pgsql") {
         parts.push("GENERATED ALWAYS AS IDENTITY");
-      } else if (this.connection === "sqlsrv") {
-        parts.push("IDENTITY(1,1)");
       }
     }
 
@@ -1003,10 +1001,7 @@ export class Blueprint {
     parts.push(options.nullable ? "NULL" : "NOT NULL");
 
     // Comment
-    if (
-      options.comment &&
-      !["sqlite", "sqlsrv"].includes(this.connection)
-    ) {
+    if (options.comment && this.connection !== "sqlite") {
       parts.push(`COMMENT '${options.comment}'`);
     }
 
@@ -1024,24 +1019,18 @@ export class Blueprint {
 
     switch (type) {
       case "string":
-        return db === "sqlsrv"
-          ? `NVARCHAR(${opts.length ?? 255})`
-          : `VARCHAR(${opts.length ?? 255})`;
+        return `VARCHAR(${opts.length ?? 255})`;
       case "char":
         return `CHAR(${opts.length ?? 1})`;
       case "uuid":
         return `CHAR(36)`;
       case "text":
-        // TEXT is deprecated in SQL Server; NVARCHAR(MAX) replaces it.
-        return db === "sqlsrv" ? "NVARCHAR(MAX)" : "TEXT";
+        return `TEXT`;
       case "tinyText":
-        if (db === "sqlsrv") return "NVARCHAR(255)";
         return db === "mysql" ? "TINYTEXT" : "TEXT";
       case "mediumText":
-        if (db === "sqlsrv") return "NVARCHAR(MAX)";
         return db === "mysql" ? "MEDIUMTEXT" : "TEXT";
       case "longText":
-        if (db === "sqlsrv") return "NVARCHAR(MAX)";
         return db === "mysql" ? "LONGTEXT" : "TEXT";
       case "integer":
         return "INTEGER";
@@ -1050,42 +1039,27 @@ export class Blueprint {
       case "smallint":
         return "SMALLINT";
       case "mediumint":
-        // No MEDIUMINT in SQL Server.
-        return db === "sqlsrv" ? "INT" : "MEDIUMINT";
+        return "MEDIUMINT";
       case "bigint":
         return "BIGINT";
       case "float":
         return "FLOAT";
       case "double":
-        // No DOUBLE in SQL Server; FLOAT is 8-byte there.
-        return db === "sqlsrv" ? "FLOAT" : "DOUBLE";
+        return "DOUBLE";
       case "decimal": {
         const precision = opts.precision ?? 8;
         const scale = opts.scale ?? 2;
         return `DECIMAL(${precision}, ${scale})`;
       }
       case "boolean":
-        if (db === "sqlsrv") return "BIT";
         return db === "mysql" ? "TINYINT(1)" : "BOOLEAN";
       case "date":
         return "DATE";
       case "datetime":
-        if (db === "sqlsrv") {
-          return opts.precision !== undefined
-            ? `DATETIME2(${opts.precision})`
-            : "DATETIME2";
-        }
         return opts.precision !== undefined
           ? `DATETIME(${opts.precision})`
           : "DATETIME";
       case "timestamp":
-        if (db === "sqlsrv") {
-          // Deliberately not TIMESTAMP: in SQL Server that is a rowversion
-          // (an auto-updating binary counter), not a point in time.
-          return opts.precision !== undefined
-            ? `DATETIME2(${opts.precision})`
-            : "DATETIME2";
-        }
         return opts.precision !== undefined
           ? `TIMESTAMP(${opts.precision})`
           : "TIMESTAMP";
@@ -1094,33 +1068,23 @@ export class Blueprint {
           ? `TIME(${opts.precision})`
           : "TIME";
       case "year":
-        // No YEAR type in SQL Server.
-        return db === "sqlsrv" ? "SMALLINT" : "YEAR";
+        return "YEAR";
       case "json":
-        if (db === "sqlsrv") return "NVARCHAR(MAX)";
         return db === "mysql" ? "JSON" : "TEXT";
       case "enum":
         if (opts.allowed?.length) {
           const quoted = opts.allowed.map((val) => `'${val}'`).join(", ");
-          // No ENUM in SQL Server; a CHECK constraint would be the faithful
-          // equivalent, which the column builder cannot express yet.
-          if (db === "sqlsrv") {
-            const widest = Math.max(...opts.allowed.map((v) => String(v).length));
-            return `NVARCHAR(${widest})`;
-          }
           return `ENUM(${quoted})`;
         }
-        return db === "sqlsrv" ? "NVARCHAR(MAX)" : "TEXT";
+        return "TEXT";
       case "set":
         if (opts.allowed?.length) {
           const quoted = opts.allowed.map((val) => `'${val}'`).join(", ");
-          // No SET in SQL Server either.
-          if (db === "sqlsrv") return "NVARCHAR(MAX)";
           return `SET(${quoted})`;
         }
-        return db === "sqlsrv" ? "NVARCHAR(MAX)" : "TEXT";
+        return "TEXT";
       case "binary":
-        return db === "sqlsrv" ? "VARBINARY(MAX)" : "BLOB";
+        return "BLOB";
       case "id": {
         if (db === "sqlite") {
           return "INTEGER PRIMARY KEY AUTOINCREMENT";
@@ -1128,17 +1092,12 @@ export class Blueprint {
           return "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY";
         } else if (db === "pgsql") {
           return "BIGSERIAL PRIMARY KEY";
-        } else if (db === "sqlsrv") {
-          return "BIGINT IDENTITY(1,1) PRIMARY KEY";
         }
         throw new Error(`Unsupported database type: ${db}`);
       }
 
       case "foreignId":
-        if (db === "sqlite") return "INTEGER";
-        // SQL Server has no UNSIGNED modifier.
-        if (db === "sqlsrv") return "BIGINT";
-        return "BIGINT UNSIGNED";
+        return db === "sqlite" ? "INTEGER" : "BIGINT UNSIGNED";
       default:
         throw new Error(`Unsupported column type: ${type}`);
     }

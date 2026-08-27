@@ -1,15 +1,9 @@
-import type { Pool, PoolClient } from "@db/pgsql";
+import type { Pool } from "@db/pgsql";
 import { QueryResultDerived } from "Database";
 
 class PgSQL {
-  /**
-   * @param source A Pool, or an already-checked-out PoolClient. During a
-   *   transaction the caller pins one client and passes it straight through —
-   *   acquiring a fresh one per query would scatter BEGIN/COMMIT across
-   *   connections. Only a client we acquired here gets released here.
-   */
   public static async query<T extends keyof QueryResultDerived>(
-    source: Pool | PoolClient,
+    pool: Pool,
     query: string,
     params: unknown[] = [],
   ): Promise<QueryResultDerived[T]> {
@@ -18,12 +12,7 @@ class PgSQL {
       ? "select"
       : cleanedQuery.split(/\s+/)[0];
 
-    // A Pool has connect(); a checked-out PoolClient does not.
-    // deno-lint-ignore no-explicit-any
-    const isPool = isFunction((source as any).connect);
-    const client = isPool
-      ? await (source as Pool).connect()
-      : (source as PoolClient);
+    const client = await pool.connect();
     try {
       // DQL: Data Queries (SELECT, SHOW, PRAGMA)
       if (["select", "show", "pragma"].includes(queryType)) {
@@ -99,13 +88,12 @@ class PgSQL {
       } as QueryResultDerived[T];
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
+      console.error("PostgreSQL Error:", error.message);
+      console.error("Query:", query);
+      console.error("Params:", params);
       throw error;
     } finally {
-      // Only release what this call acquired; a pinned client belongs to the
-      // transaction and is released when the transaction ends.
-      if (isPool) {
-        client.release();
-      }
+      client.release();
     }
   }
 }

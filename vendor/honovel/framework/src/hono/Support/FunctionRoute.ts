@@ -1110,25 +1110,11 @@ async function handleErrors(
     // for http exceptions
     resp = await exceptionToResponse(c, e);
   } else if (e instanceof SQLError) {
-    // Gated on app.debug: a database error message can name tables, columns and
-    // constraints, and renderErrorHtml includes the stack. Neither belongs in a
-    // production response.
-    console.error(e);
-    if (!config("app.debug")) {
-      resp =
-        request.expectsJson() || request.ajax()
-          ? c.json({ message: "Internal server error" }, 500)
-          : c.html("Internal server error", 500);
-    } else if (request.expectsJson() || request.ajax()) {
+    if (request.expectsJson()) {
       resp = c.json(
         {
           message: e.message,
           error_type: e.name,
-          // Present only on QueryException, and only in debug.
-          // deno-lint-ignore no-explicit-any
-          sql: (e as any).sql,
-          // deno-lint-ignore no-explicit-any
-          bindings: (e as any).bindings,
         },
         500,
       );

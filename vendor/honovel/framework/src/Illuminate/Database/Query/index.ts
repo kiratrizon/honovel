@@ -9,30 +9,6 @@ export class SQLError extends Error {
   }
 }
 
-/** A query the database rejected. Driver error on `driverError`, not `cause`. */
-export class QueryException extends SQLError {
-  // Not `cause`: Deno's console prints a nested cause with its full stack, which
-  // doubles every logged query failure. Kept reachable, just not shouted.
-  #driverError: unknown;
-
-  constructor(
-    message: string,
-    public readonly sql: string,
-    public readonly bindings: unknown[],
-    public readonly connectionName: string,
-    driverError?: unknown,
-  ) {
-    super(message);
-    this.name = "QueryException";
-    this.#driverError = driverError;
-  }
-
-  /** The original error from mysql2 / tedious / pg / sqlite. */
-  get driverError(): unknown {
-    return this.#driverError;
-  }
-}
-
 export class SQLRaw extends String {
   public override toString(): string {
     if (super.toString() === "") {

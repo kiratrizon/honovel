@@ -5,7 +5,7 @@ class SQLite {
   public static async query<T extends keyof QueryResultDerived>(
     db: Database,
     query: string,
-    params: unknown[] = [],
+    params: unknown[] = []
   ): Promise<QueryResultDerived[T]> {
     const queryType = query.trim().split(/\s+/)[0].toLowerCase();
 
@@ -39,7 +39,7 @@ class SQLite {
       // TCL: BEGIN, COMMIT, ROLLBACK, SAVEPOINT, RELEASE
       if (
         ["begin", "commit", "rollback", "savepoint", "release"].includes(
-          queryType,
+          queryType
         )
       ) {
         db.exec(query);
@@ -58,6 +58,9 @@ class SQLite {
       } as QueryResultDerived[T];
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
+      console.error("SQLite Error:", error.message);
+      console.error("Query:", query);
+      console.error("Params:", params);
       throw error;
     }
   }

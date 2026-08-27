@@ -60,7 +60,6 @@ export default class DatabaseHelper {
           port: fromReadOrWrite?.port || dbConfig.port || 5432,
           user: fromReadOrWrite?.user || dbConfig.user || "postgres",
           password: fromReadOrWrite?.password || dbConfig.password || "",
-          // pgsql requires a database name, so connect via the always-present one.
           database: "postgres",
           tls: dbConfig.tls || { enabled: false },
         };
@@ -99,11 +98,7 @@ export default class DatabaseHelper {
           conf.user = dbConfig.user || "sa";
           conf.password = dbConfig.password || "";
         }
-        // No database specified on purpose: this connection exists to check for
-        // (or create) the target database, so it cannot connect to it. Leaving it
-        // out lets SQL Server use the login's own default database, which works
-        // even where master is restricted.
-        conf.options = dbConfig.options ?? {};
+        conf.database = "master"; // SQL Server requires a database to connect
         const mssql = await loadMssql();
         const client = new mssql.ConnectionPool(conf) as MssqlConnectionPool;
         await client.connect();

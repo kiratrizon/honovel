@@ -262,83 +262,11 @@ export class DB {
   ): Promise<QueryResultDerived["delete"]> {
     return await new DBConnection(this.dbUsed).delete(table, where);
   }
-
-  public static async transaction<T>(
-    callback: (db: TransactionConnection) => Promise<T>,
-    attempts = 1,
-  ): Promise<T> {
-    return await new DBConnection(this.getDefaultConnection()).transaction(
-      callback,
-      attempts,
-    );
-  }
-}
-
-/**
- * The connection handed to a transaction callback.
- *
- * `transaction` is deliberately absent: a nested call would acquire a second
- * connection from the pool and open an independent transaction, so the inner
- * work would commit or roll back separately from the outer one. Savepoints
- * would be the correct primitive for real nesting, and are not implemented.
- */
-export type TransactionConnection = Omit<DBConnection, "transaction">;
-
-/**
- * Is this error a deadlock or serialization failure — i.e. worth retrying?
- *
- * Only these are safe to retry. A constraint violation, syntax error or bad
- * credential would fail identically every attempt, and re-running the callback
- * could repeat side effects it performed outside the database.
- *
- * Each driver reports it differently:
- *   mysql  errno 1213 ER_LOCK_DEADLOCK, 1205 lock wait timeout
- *   sqlsrv error number 1205 (deadlock victim), 1222 (lock request timeout)
- *   pgsql  SQLSTATE 40001 serialization_failure, 40P01 deadlock_detected
- *   sqlite SQLITE_BUSY / SQLITE_LOCKED, only distinguishable by message
- */
-function isRetryableTransactionError(e: unknown): boolean {
-  // deno-lint-ignore no-explicit-any
-  let err = e as any;
-  if (!isset(err)) return false;
-
-  // QueryException hides the driver error, so the vendor code is one level down
-  const inner = err.driverError ?? err.cause;
-  if (isset(inner) && isRetryableTransactionError(inner)) return true;
-
-  // mysql2
-  if (err.errno === 1213 || err.errno === 1205) return true;
-  if (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") {
-    return true;
-  }
-
-  // mssql / tedious
-  if (err.number === 1205 || err.number === 1222) return true;
-  if (err.originalError?.info?.number === 1205) return true;
-
-  // pgsql — SQLSTATE lives in different places depending on the client
-  const sqlState = err.fields?.code ?? err.code ?? err.sqlState;
-  if (sqlState === "40001" || sqlState === "40P01") return true;
-
-  // sqlite
-  const message = String(err.message ?? "").toLowerCase();
-  if (message.includes("database is locked") || message.includes("database table is locked")) {
-    return true;
-  }
-
-  return false;
 }
 
 class DBConnection {
   private readonly dbConfig: DatabaseConfig;
-  /**
-   * @param pinned Set only by transaction(): the single connection every query
-   *   from this instance must use.
-   */
-  constructor(
-    private readonly connection: string,
-    private readonly pinned?: unknown,
-  ) {
+  constructor(private readonly connection: string) {
     this.dbConfig = config("database");
     const dbUsed = this.dbConfig.connections[this.connection]
       .driver as SupportedDrivers;
@@ -358,7 +286,7 @@ class DBConnection {
     if (empty(query) || !isString(query)) {
       throw new Error("Query must be a non-empty string.");
     }
-    const db = new Database(this.connection, this.pinned);
+    const db = new Database(this.connection);
 
     try {
       await db.runQuery(query, params);
@@ -380,7 +308,7 @@ class DBConnection {
     if (["select", "show", "pragma"].indexOf(queryType) === -1) {
       throw new Error("Only SELECT, SHOW, and PRAGMA queries are allowed.");
     }
-    const db = new Database(this.connection, this.pinned);
+    const db = new Database(this.connection);
 
     try {
       const result = await db.runQuery<"select">(query, params);
@@ -414,7 +342,7 @@ class DBConnection {
       throw new Error("Data must be a non-empty objects.");
     }
 
-    const db = new Database(this.connection, this.pinned);
+    const db = new Database(this.connection);
     const [sql, values] = db.insertOrUpdateBuilder({ table, data }, uniqueKeys);
     const result = await db.runQuery<"insert">(sql, values);
     return result;
@@ -432,7 +360,7 @@ class DBConnection {
       throw new Error("Data must be a non-empty objects.");
     }
 
-    const db = new Database(this.connection, this.pinned);
+    const db = new Database(this.connection);
     const [sql, values] = db.updateBuilder(table, data, where);
     const result = await db.runQuery<"update">(sql, values);
     return result;
@@ -449,7 +377,7 @@ class DBConnection {
       throw new Error("Where clause must be a non-empty object.");
     }
 
-    const db = new Database(this.connection, this.pinned);
+    const db = new Database(this.connection);
     const [sql, values] = db.deleteBuilder(table, where);
     const result = await db.runQuery<"delete">(sql, values);
     return result;
@@ -462,110 +390,6 @@ class DBConnection {
   public getDriverName(): SupportedDrivers {
     const driver = this.dbConfig.connections[this.connection].driver;
     return driver as SupportedDrivers;
-  }
-
-  /**
-   * Run `callback` inside a database transaction.
-   *
-   * One connection is checked out and pinned for the whole block, so BEGIN, the
-   * callback's queries and COMMIT all share it. Use the `db` handed to the
-   * callback — the global `DB::` facade and Eloquent models resolve their own
-   * connection from the pool and would run OUTSIDE this transaction.
-   *
-   *     await DB.transaction(async (db) => {
-   *       await db.table("users").insert({ name: "a" });
-   *       await db.statement("UPDATE accounts SET balance = balance - 1");
-   *     });
-   *
-   * Commits when the callback resolves, rolls back when it throws.
-   */
-  public async transaction<T>(
-    callback: (db: TransactionConnection) => Promise<T>,
-    attempts = 1,
-  ): Promise<T> {
-    if (attempts < 1) {
-      throw new Error("transaction() attempts must be at least 1.");
-    }
-
-    const tag = `[transaction:${this.connection}]`;
-
-    for (let attempt = 1; ; attempt++) {
-      try {
-        return await this.runTransactionOnce(callback, tag);
-      } catch (e) {
-        // Only deadlocks and serialization failures are retried; anything else
-        // would fail the same way again.
-        if (attempt >= attempts || !isRetryableTransactionError(e)) {
-          throw e;
-        }
-        console.error(
-          `${tag} attempt ${attempt}/${attempts} hit a deadlock, retrying —`,
-          (e as Error).message,
-        );
-      }
-    }
-  }
-
-  /** One begin/callback/commit cycle on a freshly pinned connection. */
-  private async runTransactionOnce<T>(
-    callback: (db: TransactionConnection) => Promise<T>,
-    tag: string,
-  ): Promise<T> {
-    const acquired = await Database.acquire(this.connection);
-    const { client, release } = acquired;
-    const tx = new DBConnection(this.connection, client);
-
-    // Most drivers take plain SQL; sqlsrv supplies its own hooks because
-    // node-mssql drives transactions through methods rather than statements.
-    const begin = acquired.begin ?? (() => tx.statement("BEGIN"));
-    const commit = acquired.commit ?? (() => tx.statement("COMMIT"));
-    const rollback = acquired.rollback ?? (() => tx.statement("ROLLBACK"));
-
-    try {
-      await begin();
-    } catch (e) {
-      console.error(`${tag} could not begin —`, (e as Error).message);
-      release();
-      throw e;
-    }
-
-    let result: T;
-    try {
-      result = await callback(tx);
-    } catch (e) {
-      console.error(
-        `${tag} rolling back, no changes were written —`,
-        (e as Error).message,
-      );
-      try {
-        await rollback();
-      } catch (rollbackError) {
-        console.error(
-          `${tag} ROLLBACK ITSELF FAILED, changes may be left uncommitted —`,
-          (rollbackError as Error).message,
-        );
-      }
-      release();
-      throw e;
-    }
-
-    try {
-      await commit();
-      return result;
-    } catch (e) {
-      console.error(
-        `${tag} commit failed, rolling back —`,
-        (e as Error).message,
-      );
-      try {
-        await rollback();
-      } catch {
-        /* commit already failed; nothing further to attempt */
-      }
-      throw e;
-    } finally {
-      release();
-    }
   }
 }
 
