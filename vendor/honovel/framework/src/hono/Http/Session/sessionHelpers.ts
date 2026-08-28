@@ -1,17 +1,24 @@
 import { MiddlewareHandler } from "hono";
-import { Session } from "Illuminate/Session/index.ts";
+import SessionManager from "Illuminate/Session/SessionManager.ts";
 
-// Recursive type to exclude functions from any nested property
-type NonFunction<T> = T extends (...args: any[]) => any
-  ? never // exclude functions
-  : T extends object
-    ? { [K in keyof T]: NonFunction<T[K]> }
-    : T;
-
+/**
+ * Allocate the session for this request and publish it on the context.
+ *
+ * Deliberately thin: it does no I/O. Loading, cookies, garbage collection and
+ * persistence belong to StartSession, which runs in the "web" group only - so
+ * route groups without it never pay for session storage they don't use.
+ *
+ * What this does guarantee is that request.session always resolves to
+ * something on every group, which the auth guards rely on. StartSession swaps
+ * this Store for a started one through request.setSession().
+ */
 export function honoSession(): MiddlewareHandler {
   return async (c: MyContext, next: () => Promise<void>) => {
-    const value: Record<string, NonFunction<any>> = {};
-    c.set("session", new Session(value));
+    const store = new SessionManager().driver();
+
+    c.set("_sessionStore", store);
+    c.set("session", store);
+
     await next();
   };
 }

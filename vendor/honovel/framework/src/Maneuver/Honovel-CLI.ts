@@ -1214,8 +1214,8 @@ class MyArtisan {
         "--env <env:string>",
         "Specify the environment name (e.g. staging, production)",
       )
-      .action((options: { force?: boolean; env?: string }) => {
-        const envPath = this.resolveEnv(options.env);
+      .action(({ force, env }: { force?: boolean; env?: string }) => {
+        const envPath = this.resolveEnv(env);
         const key = crypto.getRandomValues(new Uint8Array(32));
         const binary = String.fromCharCode(...key);
         const base64Key = btoa(binary);
@@ -1224,7 +1224,7 @@ class MyArtisan {
           key: "APP_KEY",
           value: appKey,
           envPath,
-          force: options.force,
+          force: force,
         });
       })
 
