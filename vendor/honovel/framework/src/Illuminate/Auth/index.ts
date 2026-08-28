@@ -1,4 +1,4 @@
-import jwt from "npm:jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { JWTSubject } from "../Contracts/Auth/index.ts";
 import { Carbon } from "helpers";
 import { v4 as uuidv4 } from "uuid";
