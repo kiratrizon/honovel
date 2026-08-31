@@ -37,7 +37,6 @@ export type Variables = {
   _myHeader: HonoHeader;
   _routeParams: Record<string, string | null>;
   _built: boolean;
-  _sessionStore: SessionStore;
   _bindedModels: Record<string, typeof Model<ModelAttributes>>;
   _server: SERVER;
   _variables: Record<string, unknown>;

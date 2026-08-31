@@ -8,6 +8,7 @@ import { multiParser } from "multiParser2";
 import { CookieOptions } from "hono/utils/cookie";
 import { deleteCookie } from "hono/cookie";
 import { SessionStore } from "Illuminate/Session/Store.ts";
+import SessionManager from "Illuminate/Session/SessionManager.ts";
 import { SessionDataTypes } from "../../../../@types/declaration/imain.d.ts";
 import Model from "Illuminate/Database/Eloquent/Model.ts";
 import { ModelAttributes } from "../../../../@types/declaration/Base/IBaseModel.d.ts";
@@ -508,8 +509,13 @@ class HonoRequest extends Macroable {
     return this.header("x-requested-with")?.toLowerCase() === "xmlhttprequest";
   }
 
-  public get session() {
-    return this.#c.get("session");
+  public get session(): SessionStore {
+    let session = this.#c.get("session");
+    if (!isset(session)) {
+      session = new SessionManager().driver();
+      this.#c.set("session", session);
+    }
+    return session;
   }
 
   /**
@@ -517,7 +523,6 @@ class HonoRequest extends Macroable {
    * The analogue of Laravel's $request->setLaravelSession().
    */
   public setSession(session: SessionStore): void {
-    this.#c.set("_sessionStore", session);
     this.#c.set("session", session);
   }
 
@@ -544,7 +549,7 @@ class HonoRequest extends Macroable {
   }
 
   public get $_SESSION() {
-    return this.#c.get("session").all();
+    return this.session.all();
   }
 
   public get $_COOKIE() {
@@ -580,17 +585,14 @@ class HonoRequest extends Macroable {
    * for anywhere that wants a session without that middleware.
    */
   public async sessionStart(): Promise<void> {
-    await this.#c.get("_sessionStore")?.start();
+    await this.session.start();
   }
 
   /**
    * Drop the session entirely and issue a new, empty one.
    */
   public async sessionEnd(): Promise<void> {
-    const session = this.#c.get("_sessionStore");
-    if (!session) return;
-
-    await session.invalidate();
+    await this.session.invalidate();
     this.#c.set("logged_out", true);
   }
 
@@ -606,7 +608,7 @@ class HonoRequest extends Macroable {
     // StartSession saves the session in the "web" group. This is the safety net
     // for groups without it; Store.save() clears `started`, so the second call
     // is a no-op rather than a double write.
-    await this.#c.get("_sessionStore")?.save();
+    await this.#c.get("session")?.save(); // only if one was ever created
   }
 
   public async validate<T extends Record<string, string>>(
