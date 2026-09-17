@@ -219,7 +219,25 @@ export class URLArranger {
       return route;
     });
     const finalMapping = final.flatMap((r) => {
-      return type == "dispatch" && !r.endsWith("/") ? [r, `${r}/`] : [r];
+      if (type !== "dispatch" || r.endsWith("/")) {
+        return [r];
+      }
+
+      // duplicate the route with a trailing slash if route ends with optional param and doesn't end with a slash
+      if (r.endsWith("?")) {
+        const splittedR = r.split("/");
+        // remove "?" from the last segment
+        const lastSegment = splittedR.pop()?.replace(/\?$/, "");
+        const joinedR = splittedR.join("/");
+        if (joinedR === "/") {
+          return [joinedR, `${joinedR}${lastSegment}`];
+        } else {
+          // make another trailing so it will still accepted how laravel does it
+          return [joinedR, `${joinedR}/`, `${joinedR}/${lastSegment}`];
+        }
+      }
+
+      return [r, `${r}/`];
     });
 
     const constrainedMapping = finalMapping.map((route) => {
@@ -300,10 +318,11 @@ export function toMiddleware(
               }
               if (keyExist(RouteMiddleware, middlewareName)) {
                 const middlewareClass = RouteMiddleware[middlewareName];
-                const middlewareInstance =
-                  new (middlewareClass as new () => InstanceType<
+                const middlewareInstance = new (
+                  middlewareClass as new () => InstanceType<
                     typeof middlewareClass
-                  >)();
+                  >
+                )();
                 pushMiddlewareEntries(
                   middlewareCallback,
                   middlewareInstance,
@@ -323,9 +342,9 @@ export function toMiddleware(
           });
         } else if (keyExist(RouteMiddleware, firstKey)) {
           const middlewareClass = RouteMiddleware[firstKey];
-          const middlewareInstance = new (middlewareClass as new (
-            ...args: any[]
-          ) => any)();
+          const middlewareInstance = new (
+            middlewareClass as new (...args: any[]) => any
+          )();
           pushMiddlewareEntries(
             middlewareCallback,
             middlewareInstance,
@@ -335,9 +354,9 @@ export function toMiddleware(
         }
       } else if (keyExist(RouteMiddleware, firstKey)) {
         const middlewareClass = RouteMiddleware[firstKey];
-        const middlewareInstance = new (middlewareClass as new (
-          ...args: any[]
-        ) => any)();
+        const middlewareInstance = new (
+          middlewareClass as new (...args: any[]) => any
+        )();
         pushMiddlewareEntries(
           middlewareCallback,
           middlewareInstance,
@@ -349,9 +368,9 @@ export function toMiddleware(
       const isClass = /^class\s/.test(arg.toString());
       if (isClass) {
         const middlewareClass = arg as MiddlewareLikeClass;
-        const middlewareInstance = new (middlewareClass as new (
-          ...args: any[]
-        ) => any)();
+        const middlewareInstance = new (
+          middlewareClass as new (...args: any[]) => any
+        )();
         pushMiddlewareEntries(
           middlewareCallback,
           middlewareInstance,
